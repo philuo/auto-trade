@@ -1,0 +1,24 @@
+{
+  "name": "auto-trade",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "test": "bun test tests/api/rest-api.test.ts",
+    "test:api": "bun test tests/api/rest-api.test.ts",
+    "test:websocket": "bun test tests/websocket/websocket.test.ts",
+    "test:integration": "bun test tests/integration/*.test.ts",
+    "test:e2e": "bun test tests/integration/e2e-data-flow.test.ts",
+    "test:data-mapping": "bun test tests/integration/data-mapping.test.ts",
+    "test:all": "bun test tests/api/rest-api.test.ts && bun test tests/websocket/websocket.test.ts && bun test tests/integration/*.test.ts",
+    "strategy": "bun run src/strategies/spot-dca-grid/run-strategy.ts",
+    "strategy:demo": "bun run src/strategies/spot-dca-grid/run-strategy.ts",
+    "strategy:demo-mock": "bun run src/strategies/spot-dca-grid/demo.ts"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  }
+}
