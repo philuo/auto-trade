@@ -88,9 +88,12 @@ export class WsClient {
         isDemo: true,
         autoReconnect: true,
         reconnectInterval: 5000,
-        maxReconnectAttempts: 10,
+        maxReconnectAttempts: Infinity,  // 无限重连
         pingInterval: 25000,
         proxy: this.proxy,
+        useExponentialBackoff: true,     // 启用指数退避
+        maxReconnectInterval: 60000,      // 最大 60 秒
+        backoffMultiplier: 1.5            // 每次重连间隔增加 1.5 倍
       };
       this.auth = new OkxAuth(authConfig);
     }
@@ -545,7 +548,7 @@ export class WsClient {
       return;
     }
 
-    const maxAttempts = this.config.maxReconnectAttempts ?? 10;
+    const maxAttempts = this.config.maxReconnectAttempts ?? Infinity;
 
     // 根据来源检查对应的重连计数器
     const currentAttempts = source === 'public' ? this.publicReconnectAttempts : this.privateReconnectAttempts;
@@ -560,6 +563,11 @@ export class WsClient {
     } else {
       this.privateReconnectAttempts++;
     }
+
+    // 计算重连间隔（支持指数退避）
+    const reconnectDelay = this.calculateReconnectDelay(currentAttempts);
+
+    console.log(`[WsClient] ${source} connection reconnecting in ${reconnectDelay}ms (attempt ${currentAttempts}/${maxAttempts === Infinity ? '∞' : maxAttempts})`);
 
     // 设置重连计时器
     const reconnectTimer = setTimeout(async () => {
@@ -599,12 +607,14 @@ export class WsClient {
           this.privateReconnectAttempts = 0;
           this.privateReconnectTimer = null;
         }
+
+        console.log(`[WsClient] ${source} connection reconnected successfully`);
       } catch (error) {
         this.notifyError(error as Error);
         // 继续尝试重连
         this.handleReconnect(source);
       }
-    }, this.config.reconnectInterval ?? 5000);
+    }, reconnectDelay);
 
     // 保存计时器引用
     if (source === 'public') {
@@ -612,6 +622,26 @@ export class WsClient {
     } else {
       this.privateReconnectTimer = reconnectTimer;
     }
+  }
+
+  /**
+   * 计算重连延迟（支持指数退避）
+   */
+  private calculateReconnectDelay(attempt: number): number {
+    const baseInterval = this.config.reconnectInterval ?? 5000;
+    const useExponentialBackoff = this.config.useExponentialBackoff ?? true;
+    const maxInterval = this.config.maxReconnectInterval ?? 60000;
+    const multiplier = this.config.backoffMultiplier ?? 1.5;
+
+    if (!useExponentialBackoff) {
+      return baseInterval;
+    }
+
+    // 指数退避: baseInterval * (multiplier ^ (attempt - 1))
+    const exponentialDelay = baseInterval * Math.pow(multiplier, attempt - 1);
+
+    // 限制最大值
+    return Math.min(exponentialDelay, maxInterval);
   }
 
   // =====================================================

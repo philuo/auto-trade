@@ -64,7 +64,7 @@ export const DYNAMIC_LEVERAGE_CONFIG = {
 
     // 高波动
     high_volatility: {
-      leverage: 1.5,       // 降到1.5x
+      leverage: 1,       // 降到1x
       position: 15,
       grids: 6,
       mode: 'conservative'
@@ -96,7 +96,7 @@ export const DYNAMIC_LEVERAGE_CONFIG = {
     },
 
     medium_volatility: {
-      leverage: 1.5,
+      leverage: 1,
       position: 20,
       grids: 10,
       mode: 'conservative'
@@ -340,7 +340,7 @@ export class MarketConditionAnalyzer {
       recommendedPositionPercent = 5;
     } else if (riskScore > 50) {
       recommendedMode = 'conservative';
-      recommendedLeverage = 1.5;
+      recommendedLeverage = 1;
       recommendedPositionPercent = 15;
     } else if (riskScore < 30 && volatility === 'low') {
       recommendedMode = 'aggressive';

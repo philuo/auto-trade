@@ -12,6 +12,7 @@ import type { AllowedCoin, Decision } from '../config/strategy-config';
 import type { MarketData, CoinPosition } from '../config/types';
 import { DCAEngine } from './dca-engine';
 import { GridEngine } from './grid-engine';
+import { logger, LogType } from '../../../utils/logger';
 
 // =====================================================
 // 协同调度器状态
@@ -154,6 +155,31 @@ export class StrategyCoordinator {
       } else if (finalDecision.type === 'risk') {
         state.riskDecisions++;
       }
+
+      // 🔍 记录决策日志
+      const strategy = finalDecision.type === 'dca' ? 'dca' :
+                      finalDecision.type === 'grid' ? 'grid' : 'risk';
+
+      logger.decision({
+        coin,
+        strategy,
+        action: finalDecision.action,
+        reason: finalDecision.reason,
+        marketData: {
+          price: marketData.price,
+          change24h: marketData.changePercent24h || 0,
+          volume24h: marketData.volume24h
+        },
+        decisionFactors: {
+          urgency: finalDecision.urgency,
+          positionAmount: position.amount,
+          positionValue: position.value,
+          unrealizedPnLPercent: position.unrealizedPnLPercent,
+          coordinatorMode: state.mode,
+          dcaDecisions: state.dcaDecisions,
+          gridDecisions: state.gridDecisions
+        }
+      });
     }
 
     return finalDecision;
@@ -319,17 +345,80 @@ export class StrategyCoordinator {
     if (pnl < -10) {
       // 大幅亏损：DCA 优先模式
       if (state.mode !== 'dca_priority') {
-        this.setMode(coin, 'dca_priority', `大幅亏损: ${pnl.toFixed(1)}%`);
+        const newMode = 'dca_priority';
+        const reason = `大幅亏损: ${pnl.toFixed(1)}%`;
+        this.setMode(coin, newMode, reason);
+
+        // 🔍 记录模式调整日志
+        logger.decision({
+          coin,
+          strategy: 'risk',
+          action: 'hold',
+          reason: `协同模式调整: ${newMode}`,
+          marketData: {
+            price: position.currentPrice,
+            change24h: 0,
+            volume24h: 0
+          },
+          decisionFactors: {
+            pnl,
+            oldMode: state.mode,
+            newMode,
+            reason
+          }
+        });
       }
     } else if (pnl > 10) {
       // 大幅盈利：网格优先模式（锁定利润）
       if (state.mode !== 'grid_priority') {
-        this.setMode(coin, 'grid_priority', `大幅盈利: ${pnl.toFixed(1)}%`);
+        const newMode = 'grid_priority';
+        const reason = `大幅盈利: ${pnl.toFixed(1)}%`;
+        this.setMode(coin, newMode, reason);
+
+        // 🔍 记录模式调整日志
+        logger.decision({
+          coin,
+          strategy: 'risk',
+          action: 'hold',
+          reason: `协同模式调整: ${newMode}`,
+          marketData: {
+            price: position.currentPrice,
+            change24h: 0,
+            volume24h: 0
+          },
+          decisionFactors: {
+            pnl,
+            oldMode: state.mode,
+            newMode,
+            reason
+          }
+        });
       }
     } else if (Math.abs(pnl) < 3) {
       // 正常范围：正常模式
       if (state.mode !== 'normal') {
-        this.setMode(coin, 'normal', '盈亏正常');
+        const newMode = 'normal';
+        const reason = '盈亏正常';
+        this.setMode(coin, newMode, reason);
+
+        // 🔍 记录模式调整日志
+        logger.decision({
+          coin,
+          strategy: 'risk',
+          action: 'hold',
+          reason: `协同模式调整: ${newMode}`,
+          marketData: {
+            price: position.currentPrice,
+            change24h: 0,
+            volume24h: 0
+          },
+          decisionFactors: {
+            pnl,
+            oldMode: state.mode,
+            newMode,
+            reason
+          }
+        });
       }
     }
   }

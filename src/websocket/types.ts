@@ -348,6 +348,11 @@ export interface WsClientConfig {
   maxReconnectAttempts?: number;
   pingInterval?: number;
   proxy?: string;
+
+  // 指数退避配置
+  useExponentialBackoff?: boolean;     // 是否使用指数退避（默认 true）
+  maxReconnectInterval?: number;       // 最大重连间隔（默认 60000ms = 60秒）
+  backoffMultiplier?: number;          // 退避倍数（默认 1.5）
 }
 
 /**

@@ -60,7 +60,7 @@ export const DEFAULT_CONFIG: SpotDCAGridConfig = {
       enabled: true,
       triggerThreshold: 3,       // 价格下跌 3% 触发逆向 DCA
       levels: [
-        { priceDrop: 3, multiplier: 1.5 },   // 跌 3%: 1.5 倍买入
+        { priceDrop: 3, multiplier: 1.0 },   // 跌 3%: 1 倍买入
         { priceDrop: 5, multiplier: 2.0 },   // 跌 5%: 2 倍买入
         { priceDrop: 8, multiplier: 3.0 },   // 跌 8%: 3 倍买入
         { priceDrop: 12, multiplier: 5.0 },  // 跌 12%: 5 倍买入

@@ -21,6 +21,7 @@ import type {
   CoinPosition,
   StrategyOrder
 } from '../config/types';
+import { logger } from '../../../utils/logger';
 
 // =====================================================
 // 网格引擎状态
@@ -203,13 +204,40 @@ export class GridEngine {
     state.activeOrders.delete(orderId);
 
     // 更新统计
+    const orderSize = this.calculateOrderSize(fillPrice, state);
+    const orderValue = fillPrice * orderSize;
+
     if (grid.type === 'buy') {
       state.totalBuyOrders++;
-      state.totalBuyValue += fillPrice * this.calculateOrderSize(fillPrice, state);
+      state.totalBuyValue += orderValue;
     } else {
       state.totalSellOrders++;
-      state.totalSellValue += fillPrice * this.calculateOrderSize(fillPrice, state);
+      state.totalSellValue += orderValue;
     }
+
+    // 🔍 记录网格订单成交日志
+    logger.decision({
+      coin,
+      strategy: 'grid',
+      action: grid.type === 'buy' ? 'buy' : 'sell',
+      reason: `grid_order_filled_${grid.type}`,
+      marketData: {
+        price: fillPrice,
+        change24h: 0,
+        volume24h: 0
+      },
+      decisionFactors: {
+        gridPrice: grid.price,
+        gridType: grid.type,
+        orderSize,
+        orderValue,
+        totalBuyOrders: state.totalBuyOrders,
+        totalSellOrders: state.totalSellOrders,
+        totalBuyValue: state.totalBuyValue,
+        totalSellValue: state.totalSellValue,
+        realizedProfit: state.totalSellValue - state.totalBuyValue
+      }
+    });
 
     // 触发对应的反向订单
     await this.placeCounterOrder(coin, grid, state);

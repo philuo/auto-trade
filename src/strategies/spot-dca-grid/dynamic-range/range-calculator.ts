@@ -19,7 +19,7 @@ import { VolatilityCalculator, type VolatilityResult } from '../multi-coin/volat
 export interface RangeCalculatorConfig {
   // 基于波动率的区间宽度
   volatilityMultiplier: {
-    low: number;      // 低波动率时的倍数 (1.5x)
+    low: number;      // 低波动率时的倍数 (1x)
     medium: number;   // 中波动率时的倍数 (2.0x)
     high: number;     // 高波动率时的倍数 (3.0x)
   };
@@ -118,7 +118,7 @@ export class RangeCalculator {
   constructor(config?: Partial<RangeCalculatorConfig>, volatilityCalculator?: VolatilityCalculator) {
     this.config = {
       volatilityMultiplier: {
-        low: 1.5,
+        low: 1.0,
         medium: 2.0,
         high: 3.0
       },

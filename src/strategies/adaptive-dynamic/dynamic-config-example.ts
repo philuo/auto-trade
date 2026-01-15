@@ -62,9 +62,9 @@ export const PRACTICAL_DYNAMIC_CONFIG = {
         mode: 'normal'
       },
 
-      // 市场差时: 1.5x杠杆, 15%仓位
+      // 市场差时: 1x杠杆, 15%仓位
       badMarket: {
-        leverage: 1.5,
+        leverage: 1,
         positionPercent: 15,   // 2000 * 0.15 = 300 USDT 本金
         grids: 6,
         mode: 'conservative'

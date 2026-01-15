@@ -17,6 +17,7 @@ import type {
   CoinPosition,
   MarketData
 } from '../config/types';
+import { logger } from '../../../utils/logger';
 
 // =====================================================
 // DCA 引擎状态
@@ -136,6 +137,28 @@ export class DCAEngine {
     if (this.config.reverseDCA.enabled) {
       const reverseOrder = this.checkReverseDCA(coin, state, currentPrice, now);
       if (reverseOrder) {
+        // 🔍 记录逆向 DCA 决策日志
+        logger.decision({
+          coin,
+          strategy: 'dca',
+          action: 'buy',
+          reason: reverseOrder.reason,
+          marketData: {
+            price: currentPrice,
+            change24h: 0,
+            volume24h: 0
+          },
+          decisionFactors: {
+            dcaType: 'reverse',
+            level: reverseOrder.level,
+            multiplier: reverseOrder.multiplier,
+            orderSize: reverseOrder.size,
+            avgEntryPrice: state.avgEntryPrice,
+            priceDrop: ((state.avgEntryPrice - currentPrice) / state.avgEntryPrice * 100).toFixed(2) + '%',
+            totalOrders: state.totalOrders,
+            totalInvested: state.totalInvested
+          }
+        });
         return reverseOrder;
       }
     }
@@ -143,6 +166,26 @@ export class DCAEngine {
     // 2. 检查常规 DCA
     const regularOrder = this.checkRegularDCA(coin, state, currentPrice, now);
     if (regularOrder) {
+      // 🔍 记录常规 DCA 决策日志
+      logger.decision({
+        coin,
+        strategy: 'dca',
+        action: 'buy',
+        reason: regularOrder.reason,
+        marketData: {
+          price: currentPrice,
+          change24h: 0,
+          volume24h: 0
+        },
+        decisionFactors: {
+          dcaType: 'regular',
+          orderSize: regularOrder.size,
+          frequency: this.config.frequency,
+          totalOrders: state.totalOrders,
+          totalInvested: state.totalInvested,
+          lastRegularDCA: state.lastRegularDCA ? new Date(state.lastRegularDCA).toISOString() : 'never'
+        }
+      });
       return regularOrder;
     }
 

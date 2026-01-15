@@ -14,6 +14,7 @@ import type {
   OrderSide,
   OrderStatus
 } from '../config/types';
+import { logger, LogType } from '../../../utils/logger';
 
 // =====================================================
 // 订单追踪状态
@@ -145,6 +146,23 @@ export class OrderTracker {
     this.trackedOrders.set(order.id, trackedOrder);
     this.clientOrderIndex.set(order.clientOrderId, trackedOrder);
 
+    // 🔍 记录订单创建日志
+    logger.trade({
+      orderId: order.id,
+      clientOrderId: order.clientOrderId,
+      coin: order.coin,
+      side: order.side,
+      price: order.price,
+      size: order.size,
+      value: order.price && order.size ? order.price * order.size : undefined,
+      status: 'live',
+      metadata: {
+        strategy: trackedOrder.strategy,
+        orderType: order.type,
+        symbol: trackedOrder.symbol
+      }
+    });
+
     console.log(`[OrderTracker] 开始追踪订单: ${order.clientOrderId} (${order.symbol} ${order.side})`);
   }
 
@@ -265,6 +283,25 @@ export class OrderTracker {
     console.log(`  - 数量: ${order.filledSize}`);
     console.log(`  - 价值: ${(order.filledSize * order.avgFillPrice).toFixed(2)} USDT`);
 
+    // 🔍 记录订单成交日志
+    logger.trade({
+      orderId: order.id,
+      clientOrderId: order.clientOrderId,
+      coin: order.coin,
+      side: order.side,
+      price: order.avgFillPrice,
+      size: order.filledSize,
+      value: order.filledSize * order.avgFillPrice,
+      fee: (order.filledSize * order.avgFillPrice) * 0.001, // 假设 0.1% 手续费
+      status: 'filled',
+      metadata: {
+        strategy: order.strategy,
+        orderType: order.type,
+        symbol: order.symbol,
+        filledAt: order.filledAt
+      }
+    });
+
     // 触发成交回调
     if (order.onFill) {
       order.onFill(order);
@@ -280,6 +317,23 @@ export class OrderTracker {
    */
   private async handleOrderCanceled(order: TrackedOrder): Promise<void> {
     console.log(`[OrderTracker] 订单取消: ${order.clientOrderId}`);
+
+    // 🔍 记录订单取消日志
+    logger.trade({
+      orderId: order.id,
+      clientOrderId: order.clientOrderId,
+      coin: order.coin,
+      side: order.side,
+      price: order.price,
+      size: order.size,
+      status: 'cancelled',
+      metadata: {
+        strategy: order.strategy,
+        orderType: order.type,
+        symbol: order.symbol,
+        cancelledAt: order.cancelledAt
+      }
+    });
 
     // 触发取消回调
     if (order.onCancel) {

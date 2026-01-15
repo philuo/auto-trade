@@ -24,6 +24,9 @@ import type {
 import { DCAEngine } from './dca-engine';
 import { GridEngine } from './grid-engine';
 import { StrategyCoordinator } from './coordinator';
+import { NetworkStateManager } from '../../../core/network-state-manager.js';
+import { DualDataSourceManager, type DataSourceType } from '../../../core/dual-data-source-manager.js';
+import { Logger } from '../../../utils/logger.js';
 
 // =====================================================
 // 策略引擎配置
@@ -31,9 +34,14 @@ import { StrategyCoordinator } from './coordinator';
 
 export interface EngineConfig {
   okxApi: any;                  // OKX API 客户端
+  wsClient?: any;               // WebSocket 客户端（可选）
   updateInterval: number;        // 更新间隔（毫秒）
   enableAutoTrade: boolean;      // 是否自动交易
   maxConcurrentOrders: number;   // 最大并发订单数
+
+  // 双重数据源配置（可选）
+  enableDualDataSource?: boolean;   // 是否启用双重数据源（默认 false）
+  restPollInterval?: number;        // REST 轮询间隔（毫秒，默认 2000）
 }
 
 // =====================================================
@@ -57,6 +65,11 @@ export class SpotDCAGridStrategyEngine {
   // 市场数据缓存
   private marketDataCache: Map<AllowedCoin, MarketData> = new Map();
 
+  // 双重数据源管理
+  private networkStateManager: NetworkStateManager;
+  private dataSourceManager: DualDataSourceManager | null = null;
+  private logger: Logger;
+
   constructor(strategyConfig: SpotDCAGridConfig, engineConfig: EngineConfig) {
     this.config = strategyConfig;
     this.engineConfig = engineConfig;
@@ -76,6 +89,46 @@ export class SpotDCAGridStrategyEngine {
       startTime: Date.now(),
       lastUpdateTime: Date.now()
     };
+
+    // 初始化网络状态管理器
+    this.networkStateManager = new NetworkStateManager({
+      websocketStaleThreshold: 5000,   // 5 秒
+      restStaleThreshold: 10000,       // 10 秒
+      silentDisconnectThreshold: 8000, // 8 秒
+      logStateChanges: true
+    });
+
+    // 初始化日志
+    this.logger = Logger.getInstance();
+
+    // 初始化双重数据源管理器（如果启用）
+    if (this.engineConfig.enableDualDataSource === true) {
+      this.dataSourceManager = new DualDataSourceManager(
+        this.engineConfig.okxApi,
+        this.networkStateManager,
+        this.engineConfig.wsClient,
+        {
+          restPollInterval: this.engineConfig.restPollInterval ?? 2000,
+          enableWebSocket: !!this.engineConfig.wsClient,
+          enableDataValidation: true,
+          logDataSourceSwitches: true
+        }
+      );
+
+      // 监听市场数据更新
+      this.dataSourceManager.onMarketData((coin, data, source) => {
+        this.handleMarketDataUpdate(coin, data, source);
+      });
+
+      // 监听数据源切换事件
+      this.dataSourceManager.on('switch', (event) => {
+        this.logger.info('数据源切换', {
+          from: event.details?.from,
+          to: event.details?.to,
+          reason: event.details?.reason
+        });
+      });
+    }
   }
 
   /**
@@ -98,6 +151,13 @@ export class SpotDCAGridStrategyEngine {
 
     // 初始化活跃币种
     await this.initializeActiveCoins();
+
+    // 启动双重数据源管理器
+    if (this.dataSourceManager) {
+      const coins = Array.from(this.state.coins.keys());
+      await this.dataSourceManager.start(coins);
+      console.log('[StrategyEngine] 双重数据源管理器已启动');
+    }
 
     // 启动定时更新
     this.running = true;
@@ -123,6 +183,12 @@ export class SpotDCAGridStrategyEngine {
     if (this.intervalId) {
       clearInterval(this.intervalId);
       this.intervalId = null;
+    }
+
+    // 停止双重数据源管理器
+    if (this.dataSourceManager) {
+      this.dataSourceManager.stop();
+      console.log('[StrategyEngine] 双重数据源管理器已停止');
     }
 
     // 取消所有挂单（可选）
@@ -252,6 +318,24 @@ export class SpotDCAGridStrategyEngine {
    * 更新市场数据
    */
   private async updateMarketData(): Promise<void> {
+    // 如果启用了双重数据源管理器，数据会通过回调自动更新
+    // 这里只需要检查数据是否过期
+    if (this.dataSourceManager) {
+      const now = Date.now();
+      const networkState = this.networkStateManager.getState();
+
+      // 如果数据过期，记录警告
+      if (networkState.isDataStale) {
+        this.logger.warn('市场数据已过期', {
+          wsDataAge: now - networkState.lastWsDataTime,
+          restDataAge: now - networkState.lastRestDataTime,
+          currentSource: networkState.primarySource
+        });
+      }
+      return;
+    }
+
+    // 降级到传统 REST 轮询方式
     for (const coin of this.state.coins.keys()) {
       try {
         const symbol = `${coin}-USDT`;
@@ -278,6 +362,22 @@ export class SpotDCAGridStrategyEngine {
         console.error(`[StrategyEngine] 获取 ${coin} 市场数据失败:`, error);
       }
     }
+  }
+
+  /**
+   * 处理双重数据源管理器的市场数据更新
+   */
+  private handleMarketDataUpdate(coin: AllowedCoin, data: MarketData, source: DataSourceType): void {
+    // 更新缓存
+    this.marketDataCache.set(coin, data);
+
+    // 记录数据源（用于调试）
+    if (this.config.base.logLevel === 'debug') {
+      console.debug(`[StrategyEngine] 市场数据更新: ${coin} @ ${data.price} (来源: ${source})`);
+    }
+
+    // 注意：实际的策略决策仍然由 update() 方法中的定时器触发
+    // 这个方法只是更新缓存的数据
   }
 
   /**
@@ -499,6 +599,46 @@ export class SpotDCAGridStrategyEngine {
     report += `\n${'='.repeat(80)}\n`;
 
     return report;
+  }
+
+  /**
+   * 获取网络状态概览
+   */
+  getNetworkState() {
+    return this.networkStateManager.getState();
+  }
+
+  /**
+   * 获取数据源统计信息
+   */
+  getDataSourceStats() {
+    if (!this.dataSourceManager) {
+      return {
+        enabled: false,
+        message: '双重数据源管理器未启用'
+      };
+    }
+
+    return {
+      enabled: true,
+      ...this.dataSourceManager.getStats(),
+      networkState: this.networkStateManager.getState(),
+      reconnectStats: this.networkStateManager.getReconnectStats()
+    };
+  }
+
+  /**
+   * 获取当前使用的市场数据
+   */
+  getMarketData(coin: AllowedCoin): MarketData | null {
+    return this.marketDataCache.get(coin) || null;
+  }
+
+  /**
+   * 获取所有市场数据
+   */
+  getAllMarketData(): Map<AllowedCoin, MarketData> {
+    return new Map(this.marketDataCache);
   }
 }
 
