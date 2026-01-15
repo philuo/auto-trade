@@ -35,14 +35,22 @@
 | **[QUICK_START.md](./QUICK_START.md)** | 快速开始指南 | 所有用户 |
 | **[ARCHITECTURE.md](./ARCHITECTURE.md)** | 系统架构详解 | 开发者 |
 | **[STRATEGIES.md](./STRATEGIES.md)** | 策略详细说明 | 交易者 |
-| **[API_REFERENCE.md](./api-reference.md)** | API 接口文档 | 开发者 |
+| **[API_REFERENCE.md](./API_REFERENCE.md)** | API 接口文档 | 开发者 |
+
+### AI 量化交易文档
+
+| 文档 | 说明 | 适合人群 |
+|------|------|---------|
+| **[AI_ARCHITECTURE.md](./AI_ARCHITECTURE.md)** | AI 系统架构设计 | 架构师/开发者 |
+| **[AI_IMPLEMENTATION_V2.md](./AI_IMPLEMENTATION_V2.md)** | AI 实现方案（成本优化版） | 开发者 |
+
+**V2 优化**: AI调用频率从每分钟降低到按需触发，成本降低99%+ |
 
 ### 专题文档
 
 | 文档 | 说明 |
 |------|------|
-| **[SAFETY_GUIDE.md](./safety-guide.md)** | 安全风险指南 |
-| **[STRATEGY_TESTING.md](./STRATEGY_TESTING.md)** | 策略测试文档 |
+| **[SAFETY_GUIDE.md](./SAFETY_GUIDE.md)** | 安全风险指南 |
 
 ---
 
