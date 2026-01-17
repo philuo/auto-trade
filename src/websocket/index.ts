@@ -12,7 +12,7 @@ export {
   WsClient,
   createWsClient,
   createWsClientFromEnv,
-} from './client.js';
+} from './client;
 
 export type {
   // 通用类型
@@ -43,4 +43,4 @@ export type {
   OrderBookLevel,
   TradeChannelData,
   StatusChannelData,
-} from './types.js';
+} from './types;

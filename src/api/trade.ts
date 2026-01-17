@@ -11,9 +11,9 @@
  * - 策略订单（止盈止损、条件单）
  */
 
-import { RestClient } from './rest.js';
-import { type OkxAuth } from '../core/auth.js';
-import type { TdMode, InstType, OrderType as CoreOrderType } from '../core/constants.js';
+import { RestClient } from './rest';
+import { type OkxAuth } from '../core/auth';
+import type { TdMode, InstType, OrderType as CoreOrderType } from '../core/constants';
 
 // =====================================================
 // 订单类型

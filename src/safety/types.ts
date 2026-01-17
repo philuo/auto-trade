@@ -4,7 +4,7 @@
  * 定义交易安全验证的类型和配置
  */
 
-import type { RuleSignal } from '../rules/types.js';
+import type { RuleSignal } from '../rules/types;
 
 // =====================================================
 // 安全验证类型
@@ -180,7 +180,7 @@ export interface AccountStatus {
     coin: string;
     amount: number;
     avgCost: number;
-    unrealizedPnL: number;
+    positionPnL: number;  // 持仓盈亏（未实现盈亏，用于区分实际盈亏）
   }>;
   // 今日交易次数
   todayTradeCount: number;

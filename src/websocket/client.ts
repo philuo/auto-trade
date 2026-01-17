@@ -7,10 +7,14 @@
  * - 频道订阅与取消订阅
  * - 心跳保活
  * - 消息处理与分发
+ * - HTTP代理支持（Clash）
+ *
+ * 使用 Bun 1.3.6+ 原生 WebSocket 代理支持
  */
 
-import { OkxAuth, loadAuthFromEnv } from '../core/auth.js';
-import { API_ENDPOINTS } from '../core/constants.js';
+import { OkxAuth, loadAuthFromEnv } from '../core/auth;
+import { API_ENDPOINTS } from '../core/constants;
+import { logger } from '../utils/logger;
 import type {
   WsClientConfig,
   ConnectionState,
@@ -22,9 +26,23 @@ import type {
   WsResponse,
   WsDataMessage,
   WsChannelArgs,
-  WsRequestArgs,
-  WsRequest,
-} from './types.js';
+} from './types;
+
+// =====================================================
+// Bun WebSocket 类型扩展
+// =====================================================
+
+/**
+ * Bun WebSocket 代理配置选项
+ * 参考: https://bun.com/docs/runtime/http/websockets
+ */
+interface BunWebSocketProxyOptions {
+  /** 代理 URL (http:// 或 https://) */
+  proxy?: string | {
+    url: string;
+    headers?: Record<string, string>;
+  };
+}
 
 // =====================================================
 // WebSocket 客户端类
@@ -33,22 +51,24 @@ import type {
 export class WsClient {
   private config: WsClientConfig;
   private auth: OkxAuth;
-  private ws: WebSocket | null = null;
+  private publicWs: WebSocket | null = null;
+  private privateWs: WebSocket | null = null;
   private state: ConnectionState = 'disconnected';
   private subscriptions: Map<string, Subscription> = new Map();
 
-  // 独立的重连计数和计时器（public 和 private 分开管理）
+  // 重连管理
   private publicReconnectAttempts = 0;
   private privateReconnectAttempts = 0;
   private publicReconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private privateReconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
-  // 独立的心跳计时器（public 和 private 分开管理）
+  // 心跳管理
   private publicPingTimer: ReturnType<typeof setInterval> | null = null;
   private publicPongTimer: ReturnType<typeof setTimeout> | null = null;
   private privatePingTimer: ReturnType<typeof setInterval> | null = null;
   private privatePongTimer: ReturnType<typeof setTimeout> | null = null;
 
+  // 消息队列
   private messageQueue: string[] = [];
 
   // 事件回调
@@ -56,18 +76,49 @@ export class WsClient {
   private onCloseCallbacks: EventCallback[] = [];
   private onErrorCallbacks: ErrorCallback[] = [];
 
-  // 公共和私有连接
-  private publicWs: WebSocket | null = null;
-  private privateWs: WebSocket | null = null;
-
   // 代理设置
-  private proxy: string | undefined;
+  private proxyUrl?: string;
   private timeSynced = false;
 
   constructor(config?: WsClientConfig) {
     if (config) {
-      this.config = config;
-      this.proxy = config.proxy;
+      // 检测代理配置（支持 HTTP/HTTPS/SOCKS5）
+      const hasProxyEnv = process.env.HTTP_PROXY || process.env.http_proxy ||
+                          process.env.HTTPS_PROXY || process.env.https_proxy ||
+                          process.env.ALL_PROXY || process.env.all_proxy ||
+                          process.env.SOCKS_PROXY || process.env.socks_proxy;
+
+      // 获取代理 URL - 优先使用配置，其次环境变量
+      // 优先使用 HTTP 代理（Bun 原生支持）
+      this.proxyUrl = config.proxyUrl || config.proxy ||
+                     process.env.HTTP_PROXY || process.env.http_proxy ||
+                     process.env.HTTPS_PROXY || process.env.https_proxy;
+
+      // 如果没有 HTTP 代理，尝试将 SOCKS5 转换为 HTTP
+      if (!this.proxyUrl && hasProxyEnv) {
+        const socksProxy = process.env.ALL_PROXY || process.env.all_proxy ||
+                          process.env.SOCKS_PROXY || process.env.socks_proxy;
+        if (socksProxy && (socksProxy.startsWith('socks://') || socksProxy.startsWith('socks5://'))) {
+          const url = new URL(socksProxy);
+          this.proxyUrl = `http://${url.hostname}:${url.port}`;
+          logger.info('SOCKS5 代理转换为 HTTP 代理（Clash mixed-port）', {
+            original: socksProxy,
+            converted: this.proxyUrl
+          });
+        }
+      }
+
+      if (this.proxyUrl) {
+        logger.info('WebSocket 代理已启用', { proxy: this.proxyUrl });
+      } else if (hasProxyEnv && !this.proxyUrl) {
+        logger.warn('检测到代理环境变量但无法解析');
+      }
+
+      this.config = {
+        ...config,
+        proxyUrl: this.proxyUrl,
+      };
+
       this.auth = new OkxAuth({
         apiKey: config.apiKey,
         secretKey: config.secretKey,
@@ -75,12 +126,38 @@ export class WsClient {
         isDemo: config.isDemo ?? true
       });
     } else {
+      // 从环境变量加载配置
       const authConfig = loadAuthFromEnv();
       if (!authConfig) {
         throw new Error('Missing OKX API credentials. Please provide config or set environment variables.');
       }
-      // 从环境变量读取代理设置
-      this.proxy = process.env.HTTP_PROXY || process.env.HTTPS_PROXY;
+
+      // 检测代理配置
+      const hasProxyEnv = process.env.HTTP_PROXY || process.env.http_proxy ||
+                          process.env.HTTPS_PROXY || process.env.https_proxy ||
+                          process.env.ALL_PROXY || process.env.all_proxy ||
+                          process.env.SOCKS_PROXY || process.env.socks_proxy;
+
+      this.proxyUrl = process.env.HTTP_PROXY || process.env.http_proxy ||
+                     process.env.HTTPS_PROXY || process.env.https_proxy;
+
+      if (!this.proxyUrl && hasProxyEnv) {
+        const socksProxy = process.env.ALL_PROXY || process.env.all_proxy ||
+                          process.env.SOCKS_PROXY || process.env.socks_proxy;
+        if (socksProxy && (socksProxy.startsWith('socks://') || socksProxy.startsWith('socks5://'))) {
+          const url = new URL(socksProxy);
+          this.proxyUrl = `http://${url.hostname}:${url.port}`;
+          logger.info('SOCKS5 代理转换为 HTTP 代理', {
+            original: socksProxy,
+            converted: this.proxyUrl
+          });
+        }
+      }
+
+      if (this.proxyUrl) {
+        logger.info('WebSocket 代理已启用', { proxy: this.proxyUrl });
+      }
+
       this.config = {
         apiKey: authConfig.apiKey,
         secretKey: authConfig.secretKey,
@@ -88,73 +165,409 @@ export class WsClient {
         isDemo: true,
         autoReconnect: true,
         reconnectInterval: 5000,
-        maxReconnectAttempts: Infinity,  // 无限重连
+        maxReconnectAttempts: Infinity,
         pingInterval: 25000,
-        proxy: this.proxy,
-        useExponentialBackoff: true,     // 启用指数退避
-        maxReconnectInterval: 60000,      // 最大 60 秒
-        backoffMultiplier: 1.5            // 每次重连间隔增加 1.5 倍
+        proxyUrl: this.proxyUrl,
+        useExponentialBackoff: true,
+        maxReconnectInterval: 60000,
+        backoffMultiplier: 1.5
       };
+
       this.auth = new OkxAuth(authConfig);
     }
   }
 
+  // =====================================================
+  // 私有方法
+  // =====================================================
+
+  /**
+   * 创建带代理的 WebSocket 连接
+   */
+  private createWebSocket(url: string): WebSocket {
+    const options: BunWebSocketProxyOptions = {};
+
+    if (this.proxyUrl) {
+      options.proxy = this.proxyUrl;
+      logger.debug('创建带代理的 WebSocket', { url, proxy: this.proxyUrl });
+    } else {
+      logger.debug('创建直连 WebSocket', { url });
+    }
+
+    return new WebSocket(url, options);
+  }
+
   /**
    * 同步服务器时间
-   * 在需要认证的操作前调用
    */
   private async ensureTimeSync(): Promise<void> {
     if (!this.timeSynced) {
       const baseUrl = this.config.isDemo ? 'https://www.okx.com/api/v5' : 'https://www.okx.com/api/v5';
-      await this.auth.syncTime(baseUrl, this.proxy);
+      await this.auth.syncTime(baseUrl, this.proxyUrl);
       this.timeSynced = true;
     }
   }
 
+  /**
+   * 计算重连延迟（指数退避）
+   */
+  private getReconnectDelay(source: 'public' | 'private'): number {
+    if (!this.config.useExponentialBackoff) {
+      return this.config.reconnectInterval || 5000;
+    }
+
+    const maxInterval = this.config.maxReconnectInterval || 60000;
+    const multiplier = this.config.backoffMultiplier || 1.5;
+    const baseInterval = this.config.reconnectInterval || 5000;
+
+    const attempts = source === 'public' ? this.publicReconnectAttempts : this.privateReconnectAttempts;
+    const delay = Math.min(baseInterval * Math.pow(multiplier, attempts), maxInterval);
+
+    logger.debug('重连延迟计算', {
+      source,
+      attempts,
+      delay: `${Math.round(delay)}ms`
+    });
+
+    return delay;
+  }
+
+  /**
+   * 处理重连
+   */
+  private handleReconnect(source: 'public' | 'private'): void {
+    if (!this.config.autoReconnect) {
+      return;
+    }
+
+    const maxAttempts = this.config.maxReconnectAttempts || Infinity;
+    const attempts = source === 'public' ? this.publicReconnectAttempts : this.privateReconnectAttempts;
+
+    if (attempts >= maxAttempts) {
+      logger.warn('达到最大重连次数', { source, attempts: maxAttempts });
+      return;
+    }
+
+    const delay = this.getReconnectDelay(source);
+    const timer = setTimeout(() => {
+      if (source === 'public') {
+        this.publicReconnectTimer = null;
+        this.connectPublic().catch(err => {
+          logger.error('重连失败', { source, error: err.message });
+        });
+      } else {
+        this.privateReconnectTimer = null;
+        this.connectPrivate().catch(err => {
+          logger.error('重连失败', { source, error: err.message });
+        });
+      }
+    }, delay);
+
+    if (source === 'public') {
+      this.publicReconnectTimer = timer;
+    } else {
+      this.privateReconnectTimer = timer;
+    }
+
+    logger.info('计划重连', {
+      source,
+      delay: `${Math.round(delay)}ms`,
+      attempts: attempts + 1
+    });
+  }
+
+  /**
+   * 处理消息
+   */
+  private handleMessage(data: string, source: 'public' | 'private'): void {
+    // OKX WebSocket 发送 plain text "pong" 作为心跳响应
+    if (data === 'pong') {
+      logger.debug('收到 PONG', { source });
+      // 重置 PONG 超时计时器
+      if (source === 'public' && this.publicPongTimer) {
+        clearTimeout(this.publicPongTimer);
+        this.publicPongTimer = setTimeout(() => {
+          logger.warn('PONG 超时，关闭连接');
+          if (this.publicWs) {
+            this.publicWs.close();
+          }
+        }, (this.config.pingInterval || 25000) * 2);
+      } else if (source === 'private' && this.privatePongTimer) {
+        clearTimeout(this.privatePongTimer);
+        this.privatePongTimer = setTimeout(() => {
+          logger.warn('PONG 超时，关闭连接');
+          if (this.privateWs) {
+            this.privateWs.close();
+          }
+        }, (this.config.pingInterval || 25000) * 2);
+      }
+      return;
+    }
+
+    // 调试日志：记录收到的所有消息
+    logger.debug('收到 WebSocket 消息', { source, data: data.substring(0, 500) });
+
+    try {
+      const message: WsResponse = JSON.parse(data);
+
+      // 处理事件消息
+      if (message.event) {
+        if (message.event === 'error') {
+          logger.error('WebSocket 错误事件', {
+            source,
+            code: message.code,
+            msg: message.msg,
+            connId: message.connId
+          });
+        } else if (message.event === 'subscribe') {
+          logger.info('订阅确认', { source, channel: message.arg?.channel, instId: message.arg?.instId });
+        } else if (message.event === 'unsubscribe') {
+          logger.info('取消订阅确认', { source, channel: message.arg?.channel });
+        } else if (message.event === 'login') {
+          logger.info('登录确认', { source, code: message.code, msg: message.msg });
+        }
+        return;
+      }
+
+      // 处理数据消息
+      if (message.data && message.data.length > 0) {
+        const dataMsg = message as WsDataMessage;
+        dataMsg.data.forEach(item => {
+          // 通知订阅者
+          this.notifySubscription(item, source);
+        });
+      }
+    } catch (error) {
+      logger.error('消息解析失败', {
+        source,
+        data: data.substring(0, 200),
+        error
+      });
+    }
+  }
+
+  /**
+   * 通知订阅者
+   * 注意：key 的格式必须与 subscribe() 方法中的格式一致
+   */
+  private notifySubscription(item: any, source: 'public' | 'private'): void {
+    const channel = item.arg?.channel;
+    const instId = item.arg?.instId;
+
+    // key 格式必须与 subscribe() 方法一致
+    // 有 instId: `${source}:${channel}:${instId}`
+    // 无 instId: `${source}:${channel}`
+    const key = instId ? `${source}:${channel}:${instId}` : `${source}:${channel}`;
+
+    const subscription = this.subscriptions.get(key);
+    if (subscription && subscription.callback) {
+      try {
+        subscription.callback(item);
+      } catch (error) {
+        logger.error('订阅回调错误', {
+          key,
+          error
+        });
+      }
+    } else {
+      logger.debug('未找到订阅回调', { key, channel, instId, source });
+    }
+  }
+
+  /**
+   * 处理消息队列
+   */
+  private processMessageQueue(): void {
+    while (this.messageQueue.length > 0) {
+      const message = this.messageQueue.shift();
+      if (this.publicWs && this.publicWs.readyState === WebSocket.OPEN) {
+        this.publicWs.send(message);
+      } else if (this.privateWs && this.privateWs.readyState === WebSocket.OPEN) {
+        this.privateWs.send(message);
+      } else {
+        // 重新放回队列
+        this.messageQueue.unshift(message);
+        break;
+      }
+    }
+  }
+
+  /**
+   * 发送消息（支持排队）
+   */
+  private send(ws: WebSocket | null, data: string | object): void {
+    const message = typeof data === 'string' ? data : JSON.stringify(data);
+
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(message);
+    } else {
+      this.messageQueue.push(message);
+      logger.debug('消息已排队', { queueLength: this.messageQueue.length });
+    }
+  }
+
+  /**
+   * 启动公共频道心跳
+   * OKX WebSocket 使用 plain text "ping" 而不是 JSON {"op":"ping"}
+   */
+  private startPublicPing(): void {
+    this.stopPublicPing();
+
+    this.publicPingTimer = setInterval(() => {
+      // OKX WebSocket 期望收到 plain text "ping" 而不是 JSON
+      if (this.publicWs && this.publicWs.readyState === WebSocket.OPEN) {
+        this.publicWs.send('ping');
+      }
+    }, this.config.pingInterval || 25000);
+
+    // PONG 超时检测
+    this.publicPongTimer = setTimeout(() => {
+      logger.warn('PONG 超时，关闭连接');
+      if (this.publicWs) {
+        this.publicWs.close();
+      }
+    }, (this.config.pingInterval || 25000) * 2);
+  }
+
+  /**
+   * 停止公共频道心跳
+   */
+  private stopPublicPing(): void {
+    if (this.publicPingTimer) {
+      clearInterval(this.publicPingTimer);
+      this.publicPingTimer = null;
+    }
+    if (this.publicPongTimer) {
+      clearTimeout(this.publicPongTimer);
+      this.publicPongTimer = null;
+    }
+  }
+
+  /**
+   * 启动私有频道心跳
+   * OKX WebSocket 使用 plain text "ping" 而不是 JSON {"op":"ping"}
+   */
+  private startPrivatePing(): void {
+    this.stopPrivatePing();
+
+    this.privatePingTimer = setInterval(() => {
+      // OKX WebSocket 期望收到 plain text "ping" 而不是 JSON
+      if (this.privateWs && this.privateWs.readyState === WebSocket.OPEN) {
+        this.privateWs.send('ping');
+      }
+    }, this.config.pingInterval || 25000);
+
+    this.privatePongTimer = setTimeout(() => {
+      logger.warn('PONG 超时，关闭连接');
+      if (this.privateWs) {
+        this.privateWs.close();
+      }
+    }, (this.config.pingInterval || 25000) * 2);
+  }
+
+  /**
+   * 停止私有频道心跳
+   */
+  private stopPrivatePing(): void {
+    if (this.privatePingTimer) {
+      clearInterval(this.privatePingTimer);
+      this.privatePingTimer = null;
+    }
+    if (this.privatePongTimer) {
+      clearTimeout(this.privatePongTimer);
+      this.privatePongTimer = null;
+    }
+  }
+
+  /**
+   * 通知打开事件
+   */
+  private notifyOpen(event: WsResponse): void {
+    this.onOpenCallbacks.forEach(callback => {
+      try {
+        callback(event);
+      } catch (error) {
+        logger.error('打开回调错误', { error });
+      }
+    });
+  }
+
+  /**
+   * 通知关闭事件
+   */
+  private notifyClose(event: WsResponse): void {
+    this.onCloseCallbacks.forEach(callback => {
+      try {
+        callback(event);
+      } catch (error) {
+        logger.error('关闭回调错误', { error });
+      }
+    });
+  }
+
+  /**
+   * 通知错误事件
+   */
+  private notifyError(error: Error): void {
+    this.onErrorCallbacks.forEach(callback => {
+      try {
+        callback(error);
+      } catch (err) {
+        logger.error('错误回调错误', { error: err });
+      }
+    });
+  }
+
   // =====================================================
-  // 连接管理
+  // 公共 API
   // =====================================================
 
   /**
    * 连接到公共频道
    */
   async connectPublic(): Promise<void> {
-    if (this.publicWs?.readyState === WebSocket.OPEN) {
+    if (this.publicWs && this.publicWs.readyState === WebSocket.OPEN) {
       return;
     }
 
-    const url = this.config.isDemo
-      ? API_ENDPOINTS.DEMO_WS_PUBLIC
-      : API_ENDPOINTS.LIVE_WS_PUBLIC;
+    this.publicReconnectAttempts = 0;
 
+    // 根据是否为模拟盘选择不同的端点
+    const url = this.config.isDemo ? API_ENDPOINTS.WS_PUBLIC_DEMO : API_ENDPOINTS.WS_PUBLIC;
     this.state = 'connecting';
-    // Bun WebSocket 支持 proxy 选项
-    this.publicWs = new WebSocket(url, this.proxy ? { proxy: this.proxy } : undefined);
+    logger.info('连接公共频道', { url, isDemo: this.config.isDemo });
+
+    this.publicWs = this.createWebSocket(url);
 
     return new Promise((resolve, reject) => {
-      if (!this.publicWs) return reject(new Error('WebSocket not initialized'));
+      if (!this.publicWs) {
+        return reject(new Error('WebSocket not initialized'));
+      }
 
       this.publicWs.onopen = () => {
         this.state = 'connected';
+        this.publicReconnectAttempts = 0;
         this.startPublicPing();
         this.processMessageQueue();
-        this.notifyOpen({ event: 'open', msg: 'Public connection opened' });
+        this.notifyOpen({ event: 'open', msg: 'public connection opened' } as WsResponse);
+        logger.info('公共频道已连接');
         resolve();
       };
 
-      this.publicWs.onmessage = (event) => {
-        this.handleMessage(event.data, 'public');
+      this.publicWs.onmessage = (event: MessageEvent) => {
+        this.handleMessage(event.data as string, 'public');
       };
 
-      this.publicWs.onerror = (error) => {
-        this.notifyError(new Error(`WebSocket error: ${error}`));
+      this.publicWs.onerror = (event: Event) => {
+        const error = new Error(`WebSocket error: ${event}`);
+        this.notifyError(error);
         reject(error);
       };
 
-      this.publicWs.onclose = () => {
+      this.publicWs.onclose = (event: CloseEvent) => {
         this.state = 'disconnected';
         this.stopPublicPing();
-        this.notifyClose({ event: 'close', msg: 'Public connection closed' });
+        this.notifyClose({ event: 'close', msg: `public connection closed: ${event.code}` } as WsResponse);
         this.handleReconnect('public');
       };
     });
@@ -163,115 +576,166 @@ export class WsClient {
   /**
    * 连接到私有频道
    */
-  async connectPrivate(): Promise<void> {
-    // 私有频道需要认证，先同步时间
-    await this.ensureTimeSync();
+  async connect(): Promise<void> {
+    await Promise.all([
+      this.connectPublic(),
+      this.connectPrivate()
+    ]);
+  }
 
-    if (this.privateWs?.readyState === WebSocket.OPEN) {
+  /**
+   * 连接到私有频道
+   */
+  async connectPrivate(): Promise<void> {
+    if (this.privateWs && this.privateWs.readyState === WebSocket.OPEN) {
       return;
     }
 
-    const url = this.config.isDemo
-      ? API_ENDPOINTS.DEMO_WS_PRIVATE
-      : API_ENDPOINTS.LIVE_WS_PRIVATE;
+    this.privateReconnectAttempts = 0;
 
+    // 根据是否为模拟盘选择不同的端点
+    const url = this.config.isDemo ? API_ENDPOINTS.WS_PRIVATE_DEMO : API_ENDPOINTS.WS_PRIVATE;
     this.state = 'connecting';
-    // Bun WebSocket 支持 proxy 选项
-    this.privateWs = new WebSocket(url, this.proxy ? { proxy: this.proxy } : undefined);
+
+    await this.ensureTimeSync();
+    logger.info('连接私有频道', { url, isDemo: this.config.isDemo });
+
+    this.privateWs = this.createWebSocket(url);
 
     return new Promise((resolve, reject) => {
-      if (!this.privateWs) return reject(new Error('WebSocket not initialized'));
+      if (!this.privateWs) {
+        return reject(new Error('WebSocket not initialized'));
+      }
 
       this.privateWs.onopen = () => {
-        this.state = 'connected';
-        resolve();
+        this.state = 'authenticated';
+        this.privateReconnectAttempts = 0;
+        this.startPrivatePing();
+        this.processMessageQueue();
+
+        // 登录
+        this.login().then(() => {
+          this.notifyOpen({ event: 'open', msg: 'private connection opened' } as WsResponse);
+          logger.info('私有频道已连接并认证');
+          resolve();
+        }).catch(reject);
       };
 
-      this.privateWs.onmessage = (event) => {
-        this.handleMessage(event.data, 'private');
+      this.privateWs.onmessage = (event: MessageEvent) => {
+        this.handleMessage(event.data as string, 'private');
       };
 
-      this.privateWs.onerror = (error) => {
-        this.notifyError(new Error(`WebSocket error: ${error}`));
+      this.privateWs.onerror = (event: Event) => {
+        const error = new Error(`WebSocket error: ${event}`);
+        this.notifyError(error);
         reject(error);
       };
 
-      this.privateWs.onclose = () => {
+      this.privateWs.onclose = (event: CloseEvent) => {
         this.state = 'disconnected';
         this.stopPrivatePing();
-        this.notifyClose({ event: 'close', msg: 'Private connection closed' });
+        this.notifyClose({ event: 'close', msg: `private connection closed: ${event.code}` } as WsResponse);
         this.handleReconnect('private');
       };
     });
   }
 
   /**
-   * 连接并登录私有频道
+   * 登录
    */
-  async connect(): Promise<void> {
-    await this.ensureTimeSync();
-    await this.connectPrivate();
-    await this.login();
+  async login(): Promise<void> {
+    if (!this.privateWs || this.privateWs.readyState !== WebSocket.OPEN) {
+      throw new Error('WebSocket not connected');
+    }
+
+    const timestamp = this.auth.getSecondsTimestamp();
+    const { sign } = this.auth.sign(timestamp, 'GET', '/users/self/verify', '');
+
+    this.send(this.privateWs, {
+      op: 'login',
+      args: [
+        {
+          apiKey: this.config.apiKey,
+          passphrase: this.config.passphrase,
+          timestamp,
+          sign
+        }
+      ]
+    });
+
+    logger.debug('登录请求已发送');
   }
 
   /**
-   * 登录认证
+   * 订阅频道
    */
-  async login(): Promise<void> {
-    if (this.state !== 'connected') {
-      throw new Error('Not connected. Call connectPrivate() first.');
-    }
+  subscribe(config: SubscribeConfig, callback: ChannelCallback): void {
+    const { channel, instId } = config;
 
-    this.state = 'authenticating';
+    // 判断是否为私有频道
+    const privateChannels = ['account', 'positions', 'orders', 'algo-orders', 'balance_and_position'];
+    const isPrivateChannel = privateChannels.includes(channel);
+    const source = isPrivateChannel ? 'private' : 'public';
 
-    return new Promise((resolve, reject) => {
-      // Set up one-time login response handler first
-      const onMessage = (event: MessageEvent) => {
-        try {
-          const response = JSON.parse(event.data) as WsResponse;
+    const key = instId ? `${source}:${channel}:${instId}` : `${source}:${channel}`;
+    this.subscriptions.set(key, {
+      config,
+      callback,
+      timestamp: Date.now()
+    } as Subscription);
 
-          if (response.event === 'login' && response.code === '0') {
-            this.state = 'authenticated';
-            this.startPrivatePing();
-            this.processMessageQueue();
-            // Remove the one-time handler after successful login
-            if (this.privateWs) {
-              this.privateWs.onmessage = (e) => this.handleMessage(e.data, 'private');
-            }
-            resolve();
-          } else if (response.event === 'error') {
-            reject(new Error(`Login failed: ${response.msg}`));
-          }
-        } catch (error) {
-          reject(error);
-        }
-      };
+    // 构建订阅消息 - args 必须是数组
+    const args: WsChannelArgs = instId
+      ? { channel, instId }
+      : { channel };
 
-      if (this.privateWs) {
-        // Set the message handler before generating timestamp
-        this.privateWs.onmessage = onMessage;
+    // 根据频道类型选择 WebSocket 连接
+    const ws = isPrivateChannel ? this.privateWs : this.publicWs;
 
-        // Generate timestamp and sign right before sending to minimize expiry risk
-        // WebSocket 登录使用秒级时间戳（不是毫秒）
-        const timestamp = this.auth.getSecondsTimestamp();
-        const sign = this.auth.sign(timestamp, 'GET', '/users/self/verify', '');
-
-        const loginMessage: WsRequest = {
-          op: 'login',
-          args: [{
-            apiKey: this.config.apiKey,
-            passphrase: this.config.passphrase,
-            timestamp: timestamp,
-            sign: sign.sign,
-          }],
-        };
-
-        // Send immediately after timestamp generation
-        this.privateWs.send(JSON.stringify(loginMessage));
-      } else {
-        reject(new Error('Private WebSocket not initialized'));
-      }
+    this.send(ws, {
+      op: 'subscribe',
+      args: [args]
     });
+
+    logger.info('订阅请求已发送', { channel, instId, source });
+  }
+
+  /**
+   * 取消订阅
+   */
+  unsubscribe(channel: string, instId?: string): void {
+    // 判断是否为私有频道
+    const privateChannels = ['account', 'positions', 'orders', 'algo-orders', 'balance_and_position'];
+    const isPrivateChannel = privateChannels.includes(channel);
+    const source = isPrivateChannel ? 'private' : 'public';
+
+    const key = instId ? `${source}:${channel}:${instId}` : `${source}:${channel}`;
+    this.subscriptions.delete(key);
+
+    const args: WsChannelArgs = instId
+      ? { channel, instId }
+      : { channel };
+
+    // 根据频道类型选择 WebSocket 连接
+    const ws = isPrivateChannel ? this.privateWs : this.publicWs;
+
+    this.send(ws, {
+      op: 'unsubscribe',
+      args: [args]
+    });
+
+    logger.info('取消订阅请求已发送', { channel, instId, source });
+  }
+
+  /**
+   * 取消所有订阅
+   */
+  unsubscribeAll(): void {
+    for (const subscription of this.subscriptions.values()) {
+      this.unsubscribe(subscription.config.channel, subscription.config.instId);
+    }
+    this.subscriptions.clear();
+    logger.info('所有订阅已取消');
   }
 
   /**
@@ -281,11 +745,11 @@ export class WsClient {
     this.stopPublicPing();
     this.stopPrivatePing();
 
-    // 清除所有重连计时器
     if (this.publicReconnectTimer) {
       clearTimeout(this.publicReconnectTimer);
       this.publicReconnectTimer = null;
     }
+
     if (this.privateReconnectTimer) {
       clearTimeout(this.privateReconnectTimer);
       this.privateReconnectTimer = null;
@@ -302,461 +766,49 @@ export class WsClient {
     }
 
     this.state = 'disconnected';
-    this.subscriptions.clear();
-    this.publicReconnectAttempts = 0;
-    this.privateReconnectAttempts = 0;
-    this.timeSynced = false; // 重置时间同步标志，以便下次连接时重新同步
+    logger.info('已断开连接');
   }
 
   // =====================================================
-  // 频道订阅
+  // 事件监听器
   // =====================================================
 
-  /**
-   * 订阅频道
-   */
-  subscribe<T = unknown>(config: SubscribeConfig, callback: ChannelCallback<T>): void {
-    const key = this.getSubscriptionKey(config);
-    this.subscriptions.set(key, { config, callback: callback as ChannelCallback });
-
-    const subscribeMessage: WsRequest = {
-      op: 'subscribe',
-      args: [this.configToArgs(config)],
-    };
-
-    this.sendMessage(subscribeMessage);
-  }
-
-  /**
-   * 取消订阅
-   */
-  unsubscribe(config: SubscribeConfig): void {
-    const key = this.getSubscriptionKey(config);
-    this.subscriptions.delete(key);
-
-    const unsubscribeMessage: WsRequest = {
-      op: 'unsubscribe',
-      args: [this.configToArgs(config)],
-    };
-
-    this.sendMessage(unsubscribeMessage);
-  }
-
-  /**
-   * 取消所有订阅
-   */
-  unsubscribeAll(): void {
-    for (const [key, subscription] of this.subscriptions) {
-      const unsubscribeMessage: WsRequest = {
-        op: 'unsubscribe',
-        args: [this.configToArgs(subscription.config)],
-      };
-      this.sendMessage(unsubscribeMessage);
-    }
-    this.subscriptions.clear();
-  }
-
-  // =====================================================
-  // 消息处理
-  // =====================================================
-
-  /**
-   * 发送消息
-   */
-  private sendMessage(message: WsRequest): void {
-    const messageStr = JSON.stringify(message);
-
-    // Queue message if not connected
-    if (this.state !== 'authenticated' && this.state !== 'connected') {
-      this.messageQueue.push(messageStr);
-      return;
-    }
-
-    // Send to appropriate connection
-    const firstArg = message.args?.[0];
-    if (firstArg && this.isChannelArgs(firstArg) && this.isPrivateChannel(firstArg.channel)) {
-      if (this.privateWs?.readyState === WebSocket.OPEN) {
-        this.privateWs.send(messageStr);
-      } else {
-        this.messageQueue.push(messageStr);
-      }
-    } else {
-      if (this.publicWs?.readyState === WebSocket.OPEN) {
-        this.publicWs.send(messageStr);
-      } else {
-        this.messageQueue.push(messageStr);
-      }
-    }
-  }
-
-  /**
-   * 处理接收到的消息
-   */
-  private handleMessage(data: string, source: 'public' | 'private'): void {
-    try {
-      const response = JSON.parse(data) as WsResponse;
-
-      // Handle event messages
-      if (response.event) {
-        if (response.event === 'error') {
-          this.notifyError(new Error(`WebSocket error: ${response.msg}`));
-        } else if (response.event === 'pong') {
-          // Clear pong timeout when we receive pong response
-          // 根据来源清除对应的 pong 超时计时器
-          if (source === 'public' && this.publicPongTimer) {
-            clearTimeout(this.publicPongTimer);
-            this.publicPongTimer = null;
-          } else if (source === 'private' && this.privatePongTimer) {
-            clearTimeout(this.privatePongTimer);
-            this.privatePongTimer = null;
-          }
-        }
-        return;
-      }
-
-      // Handle data messages
-      if (response.data && response.arg) {
-        const dataMessage = response as WsDataMessage;
-        const key = this.getSubscriptionKeyFromArgs(response.arg);
-
-        const subscription = this.subscriptions.get(key);
-        if (subscription) {
-          subscription.callback(dataMessage.data);
-        }
-      }
-    } catch (error) {
-      this.notifyError(error as Error);
-    }
-  }
-
-  /**
-   * 处理消息队列
-   */
-  private processMessageQueue(): void {
-    // 使用 for 循环处理队列，以便可以将无法发送的消息重新排队
-    const initialLength = this.messageQueue.length;
-    for (let i = 0; i < initialLength; i++) {
-      const message = this.messageQueue.shift();
-      if (!message) continue;
-
-      const parsed = JSON.parse(message) as WsRequest;
-      const firstArg = parsed.args?.[0];
-
-      let sent = false;
-      if (firstArg && this.isChannelArgs(firstArg) && this.isPrivateChannel(firstArg.channel)) {
-        if (this.privateWs?.readyState === WebSocket.OPEN) {
-          this.privateWs.send(message);
-          sent = true;
-        }
-      } else {
-        if (this.publicWs?.readyState === WebSocket.OPEN) {
-          this.publicWs.send(message);
-          sent = true;
-        }
-      }
-
-      // 如果消息无法发送，重新排队到末尾
-      if (!sent) {
-        this.messageQueue.push(message);
-      }
-    }
-  }
-
-  // =====================================================
-  // 心跳与重连
-  // =====================================================
-
-  /**
-   * 开始公共连接心跳
-   */
-  private startPublicPing(): void {
-    this.stopPublicPing();
-
-    this.publicPingTimer = setInterval(() => {
-      if (this.publicWs?.readyState === WebSocket.OPEN) {
-        const pingMessage: WsRequest = { op: 'ping' };
-        this.publicWs.send(JSON.stringify(pingMessage));
-
-        // Set pong timeout
-        this.publicPongTimer = setTimeout(() => {
-          this.notifyError(new Error('Public WebSocket pong timeout'));
-          // 仅关闭和重连 public 连接
-          if (this.publicWs) {
-            this.publicWs.close();
-          }
-        }, 10000);
-      }
-    }, this.config.pingInterval ?? 25000);
-  }
-
-  /**
-   * 停止公共连接心跳
-   */
-  private stopPublicPing(): void {
-    if (this.publicPingTimer) {
-      clearInterval(this.publicPingTimer);
-      this.publicPingTimer = null;
-    }
-    if (this.publicPongTimer) {
-      clearTimeout(this.publicPongTimer);
-      this.publicPongTimer = null;
-    }
-  }
-
-  /**
-   * 开始私有连接心跳
-   */
-  private startPrivatePing(): void {
-    this.stopPrivatePing();
-
-    this.privatePingTimer = setInterval(() => {
-      if (this.privateWs?.readyState === WebSocket.OPEN) {
-        const pingMessage: WsRequest = { op: 'ping' };
-        this.privateWs.send(JSON.stringify(pingMessage));
-
-        // Set pong timeout
-        this.privatePongTimer = setTimeout(() => {
-          this.notifyError(new Error('Private WebSocket pong timeout'));
-          // 仅关闭和重连 private 连接
-          if (this.privateWs) {
-            this.privateWs.close();
-          }
-        }, 10000);
-      }
-    }, this.config.pingInterval ?? 25000);
-  }
-
-  /**
-   * 停止私有连接心跳
-   */
-  private stopPrivatePing(): void {
-    if (this.privatePingTimer) {
-      clearInterval(this.privatePingTimer);
-      this.privatePingTimer = null;
-    }
-    if (this.privatePongTimer) {
-      clearTimeout(this.privatePongTimer);
-      this.privatePongTimer = null;
-    }
-  }
-
-  /**
-   * 处理重连
-   */
-  private handleReconnect(source: 'public' | 'private'): void {
-    if (!this.config.autoReconnect) {
-      return;
-    }
-
-    const maxAttempts = this.config.maxReconnectAttempts ?? Infinity;
-
-    // 根据来源检查对应的重连计数器
-    const currentAttempts = source === 'public' ? this.publicReconnectAttempts : this.privateReconnectAttempts;
-    if (currentAttempts >= maxAttempts) {
-      this.notifyError(new Error(`${source} connection: Max reconnection attempts reached`));
-      return;
-    }
-
-    // 增加对应的重连计数
-    if (source === 'public') {
-      this.publicReconnectAttempts++;
-    } else {
-      this.privateReconnectAttempts++;
-    }
-
-    // 计算重连间隔（支持指数退避）
-    const reconnectDelay = this.calculateReconnectDelay(currentAttempts);
-
-    console.log(`[WsClient] ${source} connection reconnecting in ${reconnectDelay}ms (attempt ${currentAttempts}/${maxAttempts === Infinity ? '∞' : maxAttempts})`);
-
-    // 设置重连计时器
-    const reconnectTimer = setTimeout(async () => {
-      try {
-        if (source === 'private') {
-          await this.connectPrivate();
-          await this.login();
-          // Resubscribe to all private channels
-          for (const subscription of this.subscriptions.values()) {
-            if (this.isPrivateChannel(subscription.config.channel)) {
-              const subscribeMessage: WsRequest = {
-                op: 'subscribe',
-                args: [this.configToArgs(subscription.config)],
-              };
-              this.sendMessage(subscribeMessage);
-            }
-          }
-        } else {
-          await this.connectPublic();
-          // Resubscribe to all public channels
-          for (const subscription of this.subscriptions.values()) {
-            if (!this.isPrivateChannel(subscription.config.channel)) {
-              const subscribeMessage: WsRequest = {
-                op: 'subscribe',
-                args: [this.configToArgs(subscription.config)],
-              };
-              this.sendMessage(subscribeMessage);
-            }
-          }
-        }
-
-        // 重连成功，重置对应的计数器
-        if (source === 'public') {
-          this.publicReconnectAttempts = 0;
-          this.publicReconnectTimer = null;
-        } else {
-          this.privateReconnectAttempts = 0;
-          this.privateReconnectTimer = null;
-        }
-
-        console.log(`[WsClient] ${source} connection reconnected successfully`);
-      } catch (error) {
-        this.notifyError(error as Error);
-        // 继续尝试重连
-        this.handleReconnect(source);
-      }
-    }, reconnectDelay);
-
-    // 保存计时器引用
-    if (source === 'public') {
-      this.publicReconnectTimer = reconnectTimer;
-    } else {
-      this.privateReconnectTimer = reconnectTimer;
-    }
-  }
-
-  /**
-   * 计算重连延迟（支持指数退避）
-   */
-  private calculateReconnectDelay(attempt: number): number {
-    const baseInterval = this.config.reconnectInterval ?? 5000;
-    const useExponentialBackoff = this.config.useExponentialBackoff ?? true;
-    const maxInterval = this.config.maxReconnectInterval ?? 60000;
-    const multiplier = this.config.backoffMultiplier ?? 1.5;
-
-    if (!useExponentialBackoff) {
-      return baseInterval;
-    }
-
-    // 指数退避: baseInterval * (multiplier ^ (attempt - 1))
-    const exponentialDelay = baseInterval * Math.pow(multiplier, attempt - 1);
-
-    // 限制最大值
-    return Math.min(exponentialDelay, maxInterval);
-  }
-
-  // =====================================================
-  // 事件监听
-  // =====================================================
-
-  /**
-   * 监听连接打开事件
-   */
   onOpen(callback: EventCallback): void {
     this.onOpenCallbacks.push(callback);
   }
 
-  /**
-   * 监听连接关闭事件
-   */
   onClose(callback: EventCallback): void {
     this.onCloseCallbacks.push(callback);
   }
 
-  /**
-   * 监听错误事件
-   */
   onError(callback: ErrorCallback): void {
     this.onErrorCallbacks.push(callback);
   }
 
-  /**
-   * 移除所有监听器
-   */
-  removeAllListeners(): void {
-    this.onOpenCallbacks = [];
-    this.onCloseCallbacks = [];
-    this.onErrorCallbacks = [];
-  }
-
   // =====================================================
-  // 辅助方法
+  // 状态查询
   // =====================================================
 
-  /**
-   * 判断是否为私有频道
-   */
-  private isPrivateChannel(channel?: string): boolean {
-    const privateChannels = ['account', 'positions', 'orders', 'orders-algo'];
-    return channel ? privateChannels.includes(channel) : false;
-  }
-
-  /**
-   * 判断 args 是否为频道参数（非登录参数）
-   */
-  private isChannelArgs(args?: WsRequestArgs): args is WsChannelArgs {
-    return args !== undefined && 'channel' in args;
-  }
-
-  /**
-   * 获取订阅键
-   */
-  private getSubscriptionKey(config: SubscribeConfig): string {
-    return `${config.channel}:${config.instType ?? ''}:${config.instId ?? ''}:${config.ccy ?? ''}`;
-  }
-
-  /**
-   * 从频道参数获取订阅键
-   */
-  private getSubscriptionKeyFromArgs(args: WsChannelArgs): string {
-    return `${args.channel}:${args.instType ?? ''}:${args.instId ?? ''}:${args.ccy ?? ''}`;
-  }
-
-  /**
-   * 转换配置为频道参数
-   */
-  private configToArgs(config: SubscribeConfig): WsChannelArgs {
-    const args: WsChannelArgs = { channel: config.channel };
-    if (config.instType) args.instType = config.instType;
-    if (config.instId) args.instId = config.instId;
-    if (config.ccy) args.ccy = config.ccy;
-    if (config.instFamily) args.instFamily = config.instFamily;
-    if (config.bar) args.bar = config.bar;
-    return args;
-  }
-
-  /**
-   * 通知连接打开
-   */
-  private notifyOpen(event: WsResponse): void {
-    this.onOpenCallbacks.forEach(callback => callback(event));
-  }
-
-  /**
-   * 通知连接关闭
-   */
-  private notifyClose(event: WsResponse): void {
-    this.onCloseCallbacks.forEach(callback => callback(event));
-  }
-
-  /**
-   * 通知错误
-   */
-  private notifyError(error: Error): void {
-    this.onErrorCallbacks.forEach(callback => callback(error));
-  }
-
-  /**
-   * 获取连接状态
-   */
   getState(): ConnectionState {
     return this.state;
   }
 
-  /**
-   * 获取订阅数量
-   */
+  isConnected(): boolean {
+    return this.state === 'connected' || this.state === 'authenticated';
+  }
+
+  getSubscriptions(): Subscription[] {
+    return Array.from(this.subscriptions.values());
+  }
+
   getSubscriptionCount(): number {
     return this.subscriptions.size;
+  }
+
+  removeAllListeners(): void {
+    this.onOpenCallbacks = [];
+    this.onCloseCallbacks = [];
+    this.onErrorCallbacks = [];
   }
 }
 
@@ -765,14 +817,14 @@ export class WsClient {
 // =====================================================
 
 /**
- * 创建 WebSocket 客户端实例
+ * 创建 WebSocket 客户端
  */
-export function createWsClient(config?: WsClientConfig): WsClient {
+export function createWsClient(config: WsClientConfig): WsClient {
   return new WsClient(config);
 }
 
 /**
- * 从环境变量创建 WebSocket 客户端实例
+ * 从环境变量创建 WebSocket 客户端
  */
 export function createWsClientFromEnv(): WsClient {
   return new WsClient();

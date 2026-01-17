@@ -30,7 +30,7 @@ export type {
   PriceData,
   CandleData,
   TechnicalIndicators,
-} from './types.js';
+} from './types;
 
 // 枚举
 export {
@@ -38,15 +38,15 @@ export {
   SignalType,
   SignalStrength,
   RiskLevel,
-} from './types.js';
+} from './types;
 
 // 基类
-export { BaseRule } from './base-rule.js';
+export { BaseRule } from './base-rule;
 
 // 具体规则类
-export { DCARule } from './dca-rule.js';
-export { GridRule } from './grid-rule.js';
-export { RiskControlRule } from './risk-control-rule.js';
+export { DCARule } from './dca-rule;
+export { GridRule } from './grid-rule;
+export { RiskControlRule } from './risk-control-rule;
 
 // 规则引擎
 export {
@@ -55,4 +55,4 @@ export {
   createDCARule,
   createGridRule,
   createRiskControlRule,
-} from './rule-engine.js';
+} from './rule-engine;

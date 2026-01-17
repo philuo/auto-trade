@@ -4,7 +4,7 @@
  * 负责缓存价格、K线和技术指标数据，减少 API 调用
  */
 
-import { logger } from '../utils/logger.js';
+import { logger } from '../utils/logger';
 import type {
   PriceData,
   CandleData,
@@ -12,7 +12,7 @@ import type {
   CacheEntry,
   CacheStats,
   KLineInterval,
-} from './types.js';
+} from './types';
 
 /**
  * 价格缓存

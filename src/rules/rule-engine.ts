@@ -4,11 +4,11 @@
  * 协调管理所有交易规则，生成综合交易信号
  */
 
-import { logger } from '../utils/logger.js';
-import { BaseRule } from './base-rule.js';
-import { DCARule } from './dca-rule.js';
-import { GridRule } from './grid-rule.js';
-import { RiskControlRule } from './risk-control-rule.js';
+import { logger } from '../utils/logger;
+import { BaseRule } from './base-rule;
+import { DCARule } from './dca-rule;
+import { GridRule } from './grid-rule;
+import { RiskControlRule } from './risk-control-rule;
 import type {
   RuleEngineInput,
   RuleEngineOutput,
@@ -18,7 +18,7 @@ import type {
   GridRuleConfig,
   RiskControlRuleConfig,
   RiskAssessment,
-} from './types.js';
+} from './types;
 
 /**
  * 规则引擎类

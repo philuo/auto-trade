@@ -7,7 +7,7 @@
  * - 事件回调类型
  */
 
-import type { InstType } from '../core/constants.js';
+import type { InstType } from '../core/constants;
 
 // =====================================================
 // WebSocket 操作类型
@@ -348,6 +348,12 @@ export interface WsClientConfig {
   maxReconnectAttempts?: number;
   pingInterval?: number;
   proxy?: string;
+
+  // 代理控制
+  /** 是否启用代理 (默认: 根据环境变量自动检测) */
+  enableProxy?: boolean;
+  /** 代理URL (优先级高于环境变量) */
+  proxyUrl?: string;
 
   // 指数退避配置
   useExponentialBackoff?: boolean;     // 是否使用指数退避（默认 true）

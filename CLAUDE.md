@@ -109,3 +109,102 @@ bun --hot ./index.ts
 ```
 
 For more information, read the Bun API docs in `node_modules/bun-types/docs/**.mdx`.
+
+## Openai SDK
+
+### 使用GLM模型访问输入及输出格式
+
+#### 流式输出
+
+```ts
+import OpenAI from 'openai';
+
+const client = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+  baseURL: process.env.OPENAI_URL,
+  timeout: 60000,
+  maxRetries: 3,
+});
+
+const result_1 = await client.chat.completions.create({
+  model: 'glm-4.7',
+  messages: [
+    {
+      role: 'user',
+      content: 'Hello, world!'
+    }
+  ],
+  temperature: 1.0,
+  max_tokens: 102400,
+  stream: true
+});
+
+for await (const chunk of result_1) {
+  // 先输出思考内容：{ index: 0, delta: { role: "assistant", reasoning_content: "..." } }
+  // 后输出回答内容：{ index: 0, delta: { role: "assistant", content: "..." } }
+  console.log(chunk.choices[0]);
+}
+```
+
+### 非流式输出
+
+```ts
+const result_2 = await client.chat.completions.create({
+  model: 'glm-4.7',
+  messages: [
+    {
+      role: 'user',
+      content: 'Hello, world!'
+    }
+  ],
+  temperature: 1.0,
+  max_tokens: 102400,
+  stream: false
+});
+
+/**
+ * {
+ *    finish_reason: "stop",
+ *    index: 0,
+ *    message: {
+ *      content: "回答内容",
+ *      reasoning_content: "思考内容",
+ *      role: "assistant"
+ *    }
+ * }
+ */
+console.log(result_2.choices[0]);
+```
+
+
+### 非流失输出且关闭思考
+
+```ts
+const result_3 = await client.chat.completions.create({
+  model: 'glm-4.7',
+  messages: [
+    {
+      role: 'user',
+      content: 'Hello, world!'
+    }
+  ],
+  thinking: {
+    type: 'disabled'
+  },
+  temperature: 1.0,
+  max_tokens: 102400,
+  stream: false
+});
+
+/**
+ * {
+ *    finish_reason: "stop",
+ *    index: 0,
+ *    message: {
+ *      content: "回答内容",
+ *      role: "assistant"
+ *    }
+ * }
+ */
+console.log(result_3.choices[0]);
+```

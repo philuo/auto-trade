@@ -95,8 +95,8 @@ bun test tests/api/
 ## 运行项目
 
 ```bash
-# 开发模式运行
-bun run index.ts
+# 运行
+bun run start
 
 # 或使用热重载
 bun --hot index.ts

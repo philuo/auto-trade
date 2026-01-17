@@ -30,11 +30,7 @@ export interface TradeRecord {
   // 决策信息
   decision: {
     // 决策来源
-    source: 'ai' | 'rule' | 'coordinated';
-    // AI 分数
-    aiScore?: number;
-    // 规则分数
-    ruleScore?: number;
+    source: 'rule';
     // 综合分数
     combinedScore: number;
     // 置信度
@@ -153,9 +149,7 @@ export interface CoinPerformance {
 export interface DecisionPatternAnalysis {
   // 按来源分析
   bySource: {
-    ai: PerformanceStats;
     rule: PerformanceStats;
-    coordinated: PerformanceStats;
   };
 
   // 按币种分析
@@ -181,7 +175,7 @@ export interface DecisionPatternAnalysis {
 // =====================================================
 
 /**
- * 交易反馈（用于AI学习）
+ * 交易反馈（用于系统学习）
  */
 export interface TradingFeedback {
   // 总体表现
@@ -221,9 +215,7 @@ export interface TradingFeedback {
 
   // 按决策源表现
   bySource: {
-    ai: { trades: number; winRate: number; avgPnL: number };
     rule: { trades: number; winRate: number; avgPnL: number };
-    coordinated: { trades: number; winRate: number; avgPnL: number };
   };
 
   // 失败案例

@@ -15,14 +15,14 @@ export type {
   AccountStatus,
   TradeHistory,
   SafetyCheckFunction,
-} from './types.js';
+} from './types;
 
 // 枚举
 export {
   SafetyCheckResult,
   SafetyCheckType,
   TradeActionType,
-} from './types.js';
+} from './types;
 
 // 安全验证器类
-export { SafetyValidator } from './validator.js';
+export { SafetyValidator } from './validator;

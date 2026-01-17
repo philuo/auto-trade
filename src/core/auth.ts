@@ -8,7 +8,7 @@
  */
 
 import { createHmac } from 'node:crypto';
-import type { TdMode } from './constants.js';
+import type { TdMode } from './constants';
 
 // =====================================================
 // 认证配置
@@ -193,6 +193,11 @@ export class OkxAuth {
 
     // 非白名单币种不允许合约
     if (!swapAllowedCoins.includes(coin)) {
+      return false;
+    }
+
+    // OKX 仅支持整数倍杠杆（1x, 2x, 3x, 5x）
+    if (!Number.isInteger(leverage)) {
       return false;
     }
 

@@ -4,8 +4,8 @@
  * 在指定价格区间内设置网格，低买高卖
  */
 
-import { logger } from '../utils/logger.js';
-import { BaseRule } from './base-rule.js';
+import { logger } from '../utils/logger;
+import { BaseRule } from './base-rule;
 import type {
   GridRuleConfig,
   GridState,
@@ -13,8 +13,8 @@ import type {
   RuleEngineInput,
   RuleSignal,
   PriceData,
-} from './types.js';
-import { SignalStrength } from './types.js';
+} from './types;
+import { SignalStrength } from './types;
 
 /**
  * 网格交易规则类
@@ -44,7 +44,7 @@ export class GridRule extends BaseRule<GridRuleConfig> {
       currentPrice: 0,
       gridOrders: [],
       realizedPnL: 0,
-      unrealizedPnL: 0,
+      positionPnL: 0,
     };
   }
 
@@ -327,7 +327,7 @@ export class GridRule extends BaseRule<GridRuleConfig> {
       pendingOrders,
       filledOrders,
       realizedPnL: this.state.realizedPnL,
-      unrealizedPnL: this.state.unrealizedPnL,
+      unrealizedPnL: this.state.positionPnL,
     };
   }
 

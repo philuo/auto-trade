@@ -1,26 +1,14 @@
 /**
- * 现货交易协调器模块入口
+ * 交易模块入口
  *
- * 导出所有交易协调相关的类型、类和函数
+ * 高频量化合约交易系统
+ * 纯技术分析，无需AI
  */
 
-// 类型定义
+// 技术分析协调器（高频合约交易核心）
+export { TechnicalCoordinator } from './technical-coordinator;
 export type {
-  WeightConfig,
-  SpotCoordinatorConfig,
+  TechnicalCoordinatorConfig,
   CoordinatedDecision,
   ExecutionResult,
-  CoordinatorStats,
-  MarketContext,
-  PositionInfo,
-  AsyncTask,
-  DecisionCallback,
-  ExecutionCallback,
-  AnomalyCallback,
-} from './types.js';
-
-// 枚举
-export { TaskStatus } from './types.js';
-
-// 交易协调器
-export { SpotCoordinator } from './coordinator.js';
+} from './technical-coordinator;

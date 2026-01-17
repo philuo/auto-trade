@@ -9,9 +9,9 @@
  * - 账户配置管理
  */
 
-import { RestClient } from './rest.js';
-import { type OkxAuth } from '../core/auth.js';
-import type { TdMode, InstType } from '../core/constants.js';
+import { RestClient } from './rest';
+import { type OkxAuth } from '../core/auth';
+import type { TdMode, InstType } from '../core/constants';
 
 // =====================================================
 // 账户余额数据
@@ -80,6 +80,7 @@ export interface PositionInfo {
   instType: InstType;           // 产品类型
   instId: string;               // 产品ID
   pos: string;                  // 持仓数量
+  posSide: string;              // 持仓方向
   posCcy: string;               // 持仓币种
   avgPx: string;                // 开仓平均价
   upl: string;                  // 未实现盈亏

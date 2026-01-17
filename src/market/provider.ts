@@ -10,19 +10,19 @@
  * 4. 提供完整的市场上下文
  */
 
-import { logger } from '../utils/logger.js';
-import { OKXAPI, tickerToPriceData, klineToCandleData } from './okx-api.js';
-import { CacheManager } from './cache.js';
-import { IndicatorCalculator } from './indicators.js';
+import { logger } from '../utils/logger;
+import { OKXAPI, tickerToPriceData, klineToCandleData } from './okx-api;
+import { CacheManager } from './cache;
+import { IndicatorCalculator } from './indicators;
 import type {
   PriceData,
   CandleData,
   TechnicalIndicators,
-  MarketContext,
+  MarketDataPackage,
   MarketContextOptions,
   MarketDataConfig,
   KLineInterval,
-} from './types.js';
+} from './types;
 
 /**
  * 市场数据提供者类
@@ -229,7 +229,7 @@ export class MarketDataProvider {
    */
   async fetchIndicators(
     coin: string,
-    interval: KLineInterval = '1H',
+    interval: KLineInterval = '15m', // 改为15m以获取足够的K线数据
     klineLimit: number = 100
   ): Promise<TechnicalIndicators> {
     // 检查缓存
@@ -262,7 +262,7 @@ export class MarketDataProvider {
    */
   async fetchBatchIndicators(
     coins: string[],
-    interval: KLineInterval = '1H',
+    interval: KLineInterval = '15m', // 改为15m以获取足够的K线数据
     klineLimit: number = 100
   ): Promise<Map<string, TechnicalIndicators>> {
     const result = new Map<string, TechnicalIndicators>();
@@ -307,10 +307,10 @@ export class MarketDataProvider {
   async fetchMarketContext(
     coins: string[],
     options: MarketContextOptions = {}
-  ): Promise<MarketContext> {
+  ): Promise<MarketDataPackage> {
     const {
       includeKLines = true,
-      klineInterval = '1H',
+      klineInterval = '15m', // 改为15m以获取足够的K线数据（OKX的1H只返回10根）
       klineLimit = 100,
       includeIndicators = true,
     } = options;
@@ -422,7 +422,9 @@ export class MarketDataProvider {
    * 清除所有缓存
    */
   clearAllCache(): void {
-    this.cacheManager.clearAll();
+    this.cacheManager.priceCache.clear();
+    this.cacheManager.klineCache.clear();
+    this.cacheManager.indicatorCache.clear();
   }
 
   /**
@@ -467,5 +469,14 @@ export class MarketDataProvider {
    */
   getConfig(): Readonly<MarketDataConfig> {
     return { ...this.config };
+  }
+
+  /**
+   * 清空所有缓存
+   */
+  clearCache(): void {
+    this.cacheManager.priceCache.clear();
+    this.cacheManager.klineCache.clear();
+    this.cacheManager.indicatorCache.clear();
   }
 }

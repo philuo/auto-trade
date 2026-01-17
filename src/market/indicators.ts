@@ -11,11 +11,11 @@
  * - Bollinger Bands: 基于标准差的价格通道
  */
 
-import { logger } from '../utils/logger.js';
+import { logger } from '../utils/logger;
 import type {
   CandleData,
   TechnicalIndicators,
-} from './types.js';
+} from './types;
 
 /**
  * 技术指标计算器类
@@ -195,11 +195,11 @@ export class IndicatorCalculator {
     const fastEMA = this.calculateEMA(closes, fastPeriod);
     const slowEMA = this.calculateEMA(closes, slowPeriod);
 
-    // MACD 线
+    // MACD 线（当前值）
     const macd = fastEMA - slowEMA;
 
     // 计算信号线
-    // 需要历史MACD值来计算信号线的EMA
+    // 信号线是MACD的EMA，需要历史MACD值
     const macdHistory: number[] = [];
     for (let i = slowPeriod; i < closes.length; i++) {
       const slice = closes.slice(0, i + 1);
@@ -208,9 +208,12 @@ export class IndicatorCalculator {
       macdHistory.push(fast - slow);
     }
 
-    // 取最后 signalPeriod 个MACD值计算信号线
-    const recentMACD = macdHistory.slice(-signalPeriod * 2);
-    const signal = this.calculateEMA(recentMACD, signalPeriod);
+    // 对MACD历史序列计算EMA作为信号线
+    // 需要至少 signalPeriod 个MACD值
+    if (macdHistory.length < signalPeriod) {
+      throw new Error(`MACD历史数据不足，计算信号线需要至少${signalPeriod}个MACD值`);
+    }
+    const signal = this.calculateEMA(macdHistory, signalPeriod);
 
     // 柱状图
     const histogram = macd - signal;

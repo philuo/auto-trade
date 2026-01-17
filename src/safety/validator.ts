@@ -4,7 +4,7 @@
  * 对交易信号进行安全检查，确保交易符合风险控制要求
  */
 
-import { logger } from '../utils/logger.js';
+import { logger } from '../utils/logger;
 import type {
   SafetyValidatorConfig,
   SafetyValidationResult,
@@ -16,12 +16,12 @@ import type {
   AccountStatus,
   TradeActionType,
   TradeAdjustment,
-} from './types.js';
+} from './types;
 import {
   SafetyCheckType as CheckType,
   TradeActionType as ActionType,
   SafetyCheckResult,
-} from './types.js';
+} from './types;
 
 /**
  * 安全验证器类
@@ -550,4 +550,4 @@ export class SafetyValidator {
 }
 
 // 导出枚举
-export { SafetyCheckResult, SafetyCheckType, TradeActionType } from './types.js';
+export { SafetyCheckResult, SafetyCheckType, TradeActionType } from './types;

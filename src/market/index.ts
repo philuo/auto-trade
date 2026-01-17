@@ -13,12 +13,14 @@ export type {
   MarketContextOptions,
   MarketDataConfig,
   KLineInterval,
+  TechnicalSignal,
+  ValidatedSignal,
   CacheEntry,
   CacheStats,
   OKXResponse,
   OKXTicker,
   OKXKLineData,
-} from './types.js';
+} from './types';
 
 // 错误类
 export {
@@ -26,10 +28,10 @@ export {
   APIRequestError,
   DataParseError,
   CacheError,
-} from './types.js';
+} from './types';
 
 // OKX API
-export { OKXAPI, tickerToPriceData, klineToCandleData } from './okx-api.js';
+export { OKXAPI, tickerToPriceData, klineToCandleData } from './okx-api';
 
 // 缓存
 export {
@@ -37,10 +39,10 @@ export {
   KLineCache,
   IndicatorCache,
   CacheManager,
-} from './cache.js';
+} from './cache';
 
 // 技术指标计算
-export { IndicatorCalculator } from './indicators.js';
+export { IndicatorCalculator } from './indicators';
 
 // 市场数据提供者
-export { MarketDataProvider } from './provider.js';
+export { MarketDataProvider } from './provider';

@@ -4,16 +4,16 @@
  * 监控风险指标，在超出阈值时触发风控
  */
 
-import { logger } from '../utils/logger.js';
-import { BaseRule } from './base-rule.js';
+import { logger } from '../utils/logger;
+import { BaseRule } from './base-rule;
 import type {
   RiskControlRuleConfig,
   RiskAssessment,
   RuleEngineInput,
   RuleSignal,
   PriceData,
-} from './types.js';
-import { RiskLevel, SignalStrength } from './types.js';
+} from './types;
+import { RiskLevel, SignalStrength } from './types;
 
 /**
  * 风控规则类

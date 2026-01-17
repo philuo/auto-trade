@@ -4,15 +4,15 @@
  * 定期定额投资策略，当价格低于平均成本时增加投资金额
  */
 
-import { logger } from '../utils/logger.js';
-import { BaseRule } from './base-rule.js';
+import { logger } from '../utils/logger;
+import { BaseRule } from './base-rule;
 import type {
   DCARuleConfig,
   DCAState,
   RuleEngineInput,
   RuleSignal,
   PriceData,
-} from './types.js';
+} from './types;
 
 /**
  * DCA 规则类

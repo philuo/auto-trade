@@ -8,10 +8,10 @@
  * - 获取衍生品仓位档位
  */
 
-import { RestClient } from './rest.js';
-import { OkxAuth } from '../core/auth.js';
-import type { OkxAuth as OkxAuthType } from '../core/auth.js';
-import type { InstType } from '../core/constants.js';
+import { RestClient } from './rest';
+import { OkxAuth } from '../core/auth';
+import type { OkxAuth as OkxAuthType } from '../core/auth';
+import type { InstType } from '../core/constants';
 
 // =====================================================
 // 产品信息

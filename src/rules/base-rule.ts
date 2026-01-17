@@ -4,7 +4,7 @@
  * 定义所有规则的通用接口和基础功能
  */
 
-import { logger } from '../utils/logger.js';
+import { logger } from '../utils/logger;
 import type {
   BaseRuleConfig,
   RuleEngineInput,
@@ -12,8 +12,8 @@ import type {
   RuleSignal,
   RuleType,
   PriceData,
-} from './types.js';
-import { SignalType, SignalStrength } from './types.js';
+} from './types;
+import { SignalType, SignalStrength } from './types;
 
 /**
  * 抽象规则基类

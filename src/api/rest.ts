@@ -9,8 +9,8 @@
  * - 响应数据解析
  */
 
-import { OkxAuth, type RequestHeaders } from '../core/auth.js';
-import { ERROR_CODES, ERROR_MESSAGES, API_ENDPOINTS } from '../core/constants.js';
+import { OkxAuth } from '../core/auth';
+import { ERROR_CODES, ERROR_MESSAGES, API_ENDPOINTS } from '../core/constants';
 
 // =====================================================
 // HTTP 方法

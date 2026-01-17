@@ -12,10 +12,10 @@ export type {
   DecisionPatternAnalysis,
   TradingFeedback,
   MarketCondition,
-} from './types.js';
+} from './types;
 
 // 辅助函数
-export { getTrendCondition, getRSICondition } from './types.js';
+export { getTrendCondition, getRSICondition } from './types;
 
 // 交易历史类
-export { TradeHistory } from './trade-history.js';
+export { TradeHistory } from './trade-history;

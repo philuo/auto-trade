@@ -7,10 +7,10 @@
  * 3. 记录交易结果（平仓时）
  * 4. 计算性能统计
  * 5. 分析决策模式
- * 6. 生成AI学习反馈
+ * 6. 生成统计学习反馈（基于历史数据的规则优化）
  */
 
-import { logger } from '../utils/logger.js';
+import { logger } from '../utils/logger;
 import { Database } from 'bun:sqlite';
 import type {
   TradeRecord,
@@ -19,11 +19,10 @@ import type {
   DecisionPatternAnalysis,
   TradingFeedback,
   MarketCondition,
-} from './types.js';
-import { getTrendCondition, getRSICondition } from './types.js';
-import type { CoordinatedDecision } from '../trading/types.js';
-import type { ExecutionResult } from '../trading/types.js';
-import type { PriceData, TechnicalIndicators } from '../market/types.js';
+} from './types;
+import { getTrendCondition, getRSICondition } from './types;
+import type { CoordinatedDecision, ExecutionResult } from '../trading/index;
+import type { PriceData, TechnicalIndicators } from '../market/types;
 
 /**
  * 交易历史管理类
@@ -78,8 +77,6 @@ export class TradeHistory {
       value: valueUSDT,  // USDT 价值
       decision: {
         source: decision.source,
-        aiScore: decision.aiScore,
-        ruleScore: decision.ruleScore,
         combinedScore: decision.combinedScore,
         confidence: decision.confidence,
         reason: decision.reason,
@@ -352,8 +349,6 @@ export class TradeHistory {
         amount REAL,
         value REAL,
         decision_source TEXT,
-        decision_ai_score REAL,
-        decision_rule_score REAL,
         decision_combined_score REAL,
         decision_confidence REAL,
         decision_reason TEXT,
@@ -380,7 +375,7 @@ export class TradeHistory {
   private saveToDatabase(record: TradeRecord): void {
     const stmt = this.db.prepare(`
       INSERT OR REPLACE INTO trades VALUES (
-        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
       )
     `);
 
@@ -393,8 +388,6 @@ export class TradeHistory {
       record.amount,
       record.value,
       record.decision.source,
-      record.decision.aiScore,
-      record.decision.ruleScore,
       record.decision.combinedScore,
       record.decision.confidence,
       record.decision.reason,
@@ -499,14 +492,10 @@ export class TradeHistory {
    * 按来源分析
    */
   private analyzeBySource(trades: TradeRecord[]): DecisionPatternAnalysis['bySource'] {
-    const aiTrades = trades.filter(t => t.decision.source === 'ai' && t.result);
     const ruleTrades = trades.filter(t => t.decision.source === 'rule' && t.result);
-    const coordinatedTrades = trades.filter(t => t.decision.source === 'coordinated' && t.result);
 
     return {
-      ai: this.calculateStatsForTrades(aiTrades),
       rule: this.calculateStatsForTrades(ruleTrades),
-      coordinated: this.calculateStatsForTrades(coordinatedTrades),
     };
   }
 
@@ -645,18 +634,12 @@ export class TradeHistory {
    * 获取按来源的反馈
    */
   private getFeedbackBySource(trades: TradeRecord[]): {
-    ai: { trades: number; winRate: number; avgPnL: number };
     rule: { trades: number; winRate: number; avgPnL: number };
-    coordinated: { trades: number; winRate: number; avgPnL: number };
   } {
-    const aiTrades = trades.filter(t => t.decision.source === 'ai');
     const ruleTrades = trades.filter(t => t.decision.source === 'rule');
-    const coordinatedTrades = trades.filter(t => t.decision.source === 'coordinated');
 
     return {
-      ai: this.getFeedbackStats(aiTrades),
       rule: this.getFeedbackStats(ruleTrades),
-      coordinated: this.getFeedbackStats(coordinatedTrades),
     };
   }
 

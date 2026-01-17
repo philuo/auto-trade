@@ -3,9 +3,9 @@
  */
 
 // 核心引擎
-export { NeutralGridStrategyEngine as StrategyEngine } from './core/engine.js';
-export { NeutralGridEngine } from './core/neutral-grid-engine.js';
-export { FundingRateManager } from './core/funding-manager.js';
+export { NeutralGridStrategyEngine as StrategyEngine } from './core/engine;
+export { NeutralGridEngine } from './core/neutral-grid-engine;
+export { FundingRateManager } from './core/funding-manager;
 
 // 配置
 export {
@@ -15,7 +15,7 @@ export {
   getNeutralGridConfig,
   NEUTRAL_GRID_PRESETS,
   type NeutralGridPreset
-} from './config/default-params.js';
+} from './config/default-params;
 
 // 类型
 export type {
@@ -34,4 +34,4 @@ export type {
   NeutralGridConfigOptions,
   RiskConfig,
   FundingRateConfig
-} from './config/types.js';
+} from './config/types;

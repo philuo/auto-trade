@@ -28,6 +28,20 @@ export {
   getCoinTradeHistory
 } from './log-analyzer';
 
+// 手续费计算
+export {
+  FeeCalculator,
+  estimateVIPLevel,
+  calculateVolumeForVIP,
+} from './fee-calculator';
+export type {
+  FeeCalculationResult,
+} from './fee-calculator';
+export {
+  TradeType,
+  OrderType,
+} from './fee-calculator';
+
 // 类型导出
 export type {
   LogEntry,

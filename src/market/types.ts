@@ -5,30 +5,145 @@
  */
 
 // =====================================================
-// K线周期类型
+// 导入统一类型（用于内部引用）
+// =====================================================
+
+import type {
+  TradingMode,
+  TradingDirection,
+  OrderType,
+  OrderStatus,
+  TradingAction,
+  SpotCoin,
+  PerpetualCoin,
+  SupportedCoin,
+  TradingPair,
+  PositionInfo,
+  MarketContext,
+  BaseSignal,
+  TradingDecision,
+  OrderInfo,
+  BaseConfig,
+  CapitalConfig,
+  RiskConfig,
+  StrategyPerformance,
+  SignalStatistics,
+  SignalType,
+  KLineInterval,
+  TechnicalSignal,
+} from '../types/index';
+
+import { SignalType as SignalTypeEnum, SignalDirection as SignalDirectionEnum } from '../types/index';
+
+// =====================================================
+// 重新导出统一类型（优先使用）
+// =====================================================
+
+export type {
+  TradingMode,
+  TradingDirection,
+  OrderType,
+  OrderStatus,
+  TradingAction,
+  SpotCoin,
+  PerpetualCoin,
+  SupportedCoin,
+  TradingPair,
+  PositionInfo,
+  MarketContext,
+  BaseSignal,
+  TradingDecision,
+  OrderInfo,
+  BaseConfig,
+  CapitalConfig,
+  RiskConfig,
+  StrategyPerformance,
+  SignalStatistics,
+  KLineInterval,
+  TechnicalSignal,
+} from '../types/index';
+
+// 重新导出信号相关类型
+export { SignalType, SignalDirection } from '../types/index';
+
+// 重新导出时间周期策略类型
+export * from './timeframe-strategy';
+
+// =====================================================
+// Market 模块特有类型
 // =====================================================
 
 /**
- * K线周期
+ * 验证后的信号（包含统计信息）
  */
-export type KLineInterval =
-  | '1m'   // 1分钟
-  | '3m'   // 3分钟
-  | '5m'   // 5分钟
-  | '15m'  // 15分钟
-  | '30m'  // 30分钟
-  | '1H'   // 1小时
-  | '2H'   // 2小时
-  | '4H'   // 4小时
-  | '6H'   // 6小时
-  | '12H'  // 12小时
-  | '1D'   // 1天
-  | '1W'   // 1周
-  | '1M';  // 1月
+export interface ValidatedSignal extends TechnicalSignal {
+  // 明确声明继承的属性以确保类型推断正确
+  /** 信号类型 */
+  type: import('../types/index').SignalType;
+  /** 信号强度 0-1 */
+  strength: number;
+  /** 信号方向 */
+  direction: import('../types/index').SignalDirection;
+
+  /** 统计信息 */
+  statistics: {
+    /** 总交易次数 */
+    totalTrades: number;
+    /** 盈利次数 */
+    winningTrades: number;
+    /** 胜率 */
+    winRate: number;
+    /** 平均盈利 */
+    avgWin: number;
+    /** 平均亏损 */
+    avgLoss: number;
+    /** 盈亏比 */
+    profitFactor: number;
+    /** 最大回撤 */
+    maxDrawdown: number;
+    /** 夏普比率 */
+    sharpeRatio: number;
+    /** 是否统计显著 */
+    isSignificant: boolean;
+    /** 最后更新时间 */
+    lastUpdated: number;
+  };
+  /** 置信度信息 */
+  confidence: {
+    /** 置信度值 0-1 */
+    value: number;
+    /** 建议仓位比例 0-1 */
+    positionSize: number;
+    /** 风险等级 */
+    riskLevel: 'low' | 'medium' | 'high';
+    /** 止损距离（百分比，如 0.02 = 2%） */
+    stopLossDistance: number;
+    /** 止盈距离（百分比，如 0.03 = 3%） */
+    takeProfitDistance: number;
+  };
+  /** 是否通过验证 */
+  isValid: boolean;
+  /** 验证失败原因 */
+  validationErrors?: string[];
+}
+
+/**
+ * 市场环境
+ */
+export interface MarketCondition {
+  /** 趋势方向 */
+  trend: 'strong_uptrend' | 'uptrend' | 'sideways' | 'downtrend' | 'strong_downtrend';
+  /** 波动率水平 */
+  volatility: 'low' | 'normal' | 'high' | 'extreme';
+  /** 成交量水平 */
+  volume: 'low' | 'normal' | 'high';
+}
 
 // =====================================================
-// 市场数据类型
+// 市场数据类型（特有，不与统一类型冲突）
 // =====================================================
+
+// 注意：PositionInfo 已从 ../types/index 导入
 
 /**
  * 价格数据
@@ -69,7 +184,7 @@ export interface CandleData {
   // 成交量
   volume: number;
   // 成交额
-  volumeCcy: number;
+  volumeCcy?: number;
 }
 
 /**
@@ -99,9 +214,10 @@ export interface TechnicalIndicators {
 }
 
 /**
- * 市场上下文
+ * 市场数据包（市场模块特有的完整数据结构）
+ * 注意：这与 types/index.ts 中的 MarketContext 不同
  */
-export interface MarketContext {
+export interface MarketDataPackage {
   // 实时价格
   prices: Map<string, PriceData>;
   // K线数据
@@ -241,7 +357,7 @@ export interface OKXTicker {
 
 /**
  * OKX K线数据（数组格式）
- * [timestamp, open, high, low, close, volume, volumeCcy]
+ * [timestamp, open, high, low, close, volume, volumeCcy, confirm?]
  */
 export type OKXKLineData = [
   string,  // timestamp
@@ -253,6 +369,107 @@ export type OKXKLineData = [
   string,  // volumeCcy
   string?, // confirm (可选)
 ];
+
+/**
+ * K线原始数据（从 API 直接返回）
+ */
+export type CandleRaw = [
+  string,  // timestamp
+  string,  // open
+  string,  // high
+  string,  // low
+  string,  // close
+  string,  // volume
+  string,  // volCcy
+  string?, // volCcyQuote (可选)
+  string?, // confirm (可选)
+];
+
+/**
+ * K线数字格式（所有值转为数字）
+ */
+export interface CandleNumber {
+  timestamp: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+  volCcy: number;
+  volCcyQuote?: number;
+  confirm: boolean;
+}
+
+/**
+ * 完整的 Ticker 数据（扩展自 OKXTicker）
+ */
+export interface Ticker extends OKXTicker {
+  instType: string;  // 产品类型
+  askSz?: string;    // 卖一量
+  bidSz?: string;    // 买一量
+  sodUtc0?: string;  // UTC 0 时区开盘时间
+  sodUtc8?: string;  // UTC 8 时区开盘时间
+  // 计算字段
+  price?: number;           // 最新价格（数字格式）
+  change24h?: number;       // 24h变化率（百分比）
+}
+
+/**
+ * 订单簿数据
+ */
+export interface OrderBook {
+  asks: [string, string, string, string][];  // 卖单 [price, size, orders, orders]
+  bids: [string, string, string, string][];  // 买单 [price, size, orders, orders]
+  ts: string;  // 时间戳
+}
+
+/**
+ * 订单簿数据（含订单数）
+ */
+export interface OrderBookWithNum {
+  asks: [string, string, string, string][];  // 卖单 [price, size, orders, orders]
+  bids: [string, string, string, string][];  // 买单 [price, size, orders, orders]
+  ts: string;  // 时间戳
+}
+
+/**
+ * 订单簿查询参数
+ */
+export interface OrderBookParams {
+  instId: string;  // 产品ID
+  sz?: number;     // 订单簿深度（默认1）
+}
+
+/**
+ * K线查询参数
+ */
+export interface CandlesParams {
+  instId: string;  // 产品ID
+  bar?: KLineInterval;  // K线周期
+  after?: string;  // 请求此时间戳之前的数据
+  before?: string; // 请求此时间戳之后的数据
+  limit?: string;  // 返回数量（默认100，最大300）
+}
+
+/**
+ * 成交数据
+ */
+export interface Trade {
+  instId: string;  // 产品ID
+  tradeId: string;  // 成交ID
+  px: string;  // 成交价格
+  sz: string;  // 成交数量
+  side: string;  // 成交方向 buy/sell
+  ts: string;  // 成交时间戳
+}
+
+/**
+ * 成交查询参数
+ */
+export interface TradesParams {
+  instId: string;  // 产品ID
+  limit?: string;  // 返回数量（默认100，最大500）
+}
 
 // =====================================================
 // 错误类型
