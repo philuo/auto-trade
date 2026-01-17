@@ -181,10 +181,7 @@ export class DualDataSourceManager {
     // 取消 WebSocket 订阅
     if (this.wsClient && this.wsSubscribedCoins.size > 0) {
       for (const coin of this.wsSubscribedCoins) {
-        this.wsClient.unsubscribe({
-          channel: 'tickers',
-          instId: `${coin}-USDT`
-        });
+        this.wsClient.unsubscribe('tickers', `${coin}-USDT`);
       }
       this.wsSubscribedCoins.clear();
     }
@@ -687,10 +684,7 @@ export class DualDataSourceManager {
 
     // 取消 WebSocket 订阅
     if (this.wsClient && this.wsSubscribedCoins.has(coin)) {
-      this.wsClient.unsubscribe({
-        channel: 'tickers',
-        instId: `${coin}-USDT`
-      });
+      this.wsClient.unsubscribe('tickers', `${coin}-USDT`);
       this.wsSubscribedCoins.delete(coin);
     }
 

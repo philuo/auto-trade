@@ -44,7 +44,7 @@ export class GridRule extends BaseRule<GridRuleConfig> {
       currentPrice: 0,
       gridOrders: [],
       realizedPnL: 0,
-      unrealizedPnL: 0,
+      positionPnL: 0,
     };
   }
 
@@ -327,7 +327,7 @@ export class GridRule extends BaseRule<GridRuleConfig> {
       pendingOrders,
       filledOrders,
       realizedPnL: this.state.realizedPnL,
-      unrealizedPnL: this.state.unrealizedPnL,
+      unrealizedPnL: this.state.positionPnL,
     };
   }
 

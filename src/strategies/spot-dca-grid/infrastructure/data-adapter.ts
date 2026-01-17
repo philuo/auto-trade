@@ -11,7 +11,7 @@
 
 import type { AllowedCoin } from '../config/strategy-config.js';
 import type { Candle as StrategyCandle, MarketData, CoinPosition } from '../config/types.js';
-import type { Ticker, Candle as ApiCandle, CandleRaw } from '../../../api/market.js';
+import type { Ticker, CandleRaw, CandleNumber } from '../../../market/types.js';
 import type { BalanceInfo } from '../../../api/account.js';
 import { parseCandle, candleToNumberFormat, safeParseNumber } from '../../../api/market.js';
 
@@ -74,15 +74,15 @@ export class DataAdapter {
    * 将 OKX Candle 对象转换为策略模块的 Candle 格式
    * (如果 API 返回的是解析后的对象格式)
    */
-  static candleToStrategy(candle: ApiCandle): StrategyCandle {
+  static candleToStrategy(candle: CandleNumber): StrategyCandle {
     return {
-      timestamp: parseInt(candle.timestamp, 10),
-      open: parseFloat(candle.open),
-      high: parseFloat(candle.high),
-      low: parseFloat(candle.low),
-      close: parseFloat(candle.close),
-      volume: parseFloat(candle.volume),
-      volumeCcy: parseFloat(candle.volCcy)
+      timestamp: candle.timestamp,
+      open: candle.open,
+      high: candle.high,
+      low: candle.low,
+      close: candle.close,
+      volume: candle.volume,
+      volumeCcy: candle.volCcy
     };
   }
 

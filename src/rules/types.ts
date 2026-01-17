@@ -162,7 +162,7 @@ export interface GridState {
   // 已实现盈亏
   realizedPnL: number;
   // 未实现盈亏
-  unrealizedPnL: number;
+  positionPnL: number;  // 持仓盈亏（未实现盈亏，用于区分实际盈亏）
 }
 
 /**
@@ -374,7 +374,7 @@ export interface RuleEngineInput {
     coin: string;
     amount: number;
     avgCost: number;
-    unrealizedPnL: number;
+    positionPnL: number;  // 持仓盈亏（未实现盈亏，用于区分实际盈亏）
   }>;
   // 可用余额
   availableBalance: number;

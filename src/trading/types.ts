@@ -6,7 +6,7 @@
 
 import type { RuleSignal } from '../rules/types.js';
 import type { AITradingDecision, MarketScanResult } from '../ai/types.js';
-import type { MarketContext as BaseMarketContext } from '../market/types.js';
+import type { MarketContext as BaseMarketContext, ValidatedSignal } from '../market/types.js';
 
 // =====================================================
 // 协调器配置类型
@@ -94,6 +94,12 @@ export interface CoordinatedDecision {
   suggestedAmount?: number;
   // 决策来源
   source: 'ai' | 'rule' | 'coordinated';
+  // 止损价格
+  stopLoss?: number;
+  // 止盈价格
+  takeProfit?: number;
+  // 组成此决策的信号（技术分析用）
+  signals?: ValidatedSignal[];
 }
 
 /**
@@ -156,13 +162,15 @@ export interface CoordinatorStats {
 // 市场数据类型
 // =====================================================
 
-// 重新导出市场模块的 MarketContext
-export type { MarketContext } from '../market/types.js';
+// 重新导出市场模块的 MarketDataPackage（别名为 MarketContext）
+// 注意：这里使用 MarketDataPackage 而不是 MarketContext，因为它的结构更符合 trading 模块的需求
+export type { MarketDataPackage as MarketContext } from '../market/types.js';
 
 /**
- * 持仓信息
+ * 扩展的持仓信息（trading 模块特有）
+ * 注意：这与 types/index.ts 中的 PositionInfo 不同
  */
-export interface PositionInfo {
+export interface TradingPositionInfo {
   // 币种
   coin: string;
   // 数量
@@ -171,11 +179,14 @@ export interface PositionInfo {
   avgCost: number;
   // 当前价值
   currentValue: number;
-  // 未实现盈亏
-  unrealizedPnL: number;
+  // 持仓盈亏（未实现盈亏，用于区分实际盈亏）
+  positionPnL: number;
   // 盈亏比例
   pnlPercent: number;
 }
+
+// 为了向后兼容，导出 PositionInfo 别名
+export type PositionInfo = TradingPositionInfo;
 
 // =====================================================
 // 异步任务类型

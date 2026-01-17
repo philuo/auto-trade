@@ -196,6 +196,11 @@ export class OkxAuth {
       return false;
     }
 
+    // OKX 仅支持整数倍杠杆（1x, 2x, 3x, 5x）
+    if (!Number.isInteger(leverage)) {
+      return false;
+    }
+
     const limits: Record<string, number> = {
       'BTC': 5,
       'ETH': 3,

@@ -575,11 +575,17 @@ export class FileLogStorage {
   }
 
   /**
-   * 获取当前日期字符串
+   * 获取当前日期字符串（东八区）
    */
   private getDateStr(): string {
     const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    // 转换为东八区时间 (UTC+8)
+    // getTimezoneOffset() 返回本地时区与 UTC 的分钟差
+    // 例如：UTC-8 返回 480，UTC+8 返回 -480
+    const utcTime = now.getTime() + (now.getTimezoneOffset() * 60 * 1000);
+    const beijingTime = utcTime + (8 * 60 * 60 * 1000);
+    const beijingDate = new Date(beijingTime);
+    return `${beijingDate.getFullYear()}-${String(beijingDate.getMonth() + 1).padStart(2, '0')}-${String(beijingDate.getDate()).padStart(2, '0')}`;
   }
 
   /**
@@ -593,15 +599,24 @@ export class FileLogStorage {
 
   /**
    * 格式化时间戳为 YYYY-MM-DD hh:mm:ss
+   * 强制使用东八区时间（UTC+8 中国标准时间）
    */
   private formatTimestamp(timestamp: number): string {
+    // 将时间戳转换为 Date 对象
     const date = new Date(timestamp);
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    const hours = String(date.getHours()).padStart(2, '0');
-    const minutes = String(date.getMinutes()).padStart(2, '0');
-    const seconds = String(date.getSeconds()).padStart(2, '0');
+
+    // 转换为东八区时间（UTC+8）
+    const utcTimestamp = date.getTime() + (date.getTimezoneOffset() * 60 * 1000);
+    const beijingTimestamp = utcTimestamp + (8 * 60 * 60 * 1000);
+    const beijingDate = new Date(beijingTimestamp);
+
+    const year = beijingDate.getFullYear();
+    const month = String(beijingDate.getMonth() + 1).padStart(2, '0');
+    const day = String(beijingDate.getDate()).padStart(2, '0');
+    const hours = String(beijingDate.getHours()).padStart(2, '0');
+    const minutes = String(beijingDate.getMinutes()).padStart(2, '0');
+    const seconds = String(beijingDate.getSeconds()).padStart(2, '0');
+
     return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
   }
 
@@ -785,21 +800,26 @@ export class Logger {
 
   /**
    * 格式化时间戳为 YYYY-MM-DD hh:mm:ss
+   * 强制使用东八区时间（UTC+8 中国标准时间）
    */
   private formatTimestamp(timestamp: number): string {
+    // 将时间戳转换为 Date 对象
     const date = new Date(timestamp);
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    const hours = String(date.getHours()).padStart(2, '0');
-    const minutes = String(date.getMinutes()).padStart(2, '0');
-    const seconds = String(date.getSeconds()).padStart(2, '0');
+
+    // 转换为东八区时间（UTC+8）
+    const utcTimestamp = date.getTime() + (date.getTimezoneOffset() * 60 * 1000);
+    const beijingTimestamp = utcTimestamp + (8 * 60 * 60 * 1000);
+    const beijingDate = new Date(beijingTimestamp);
+
+    const year = beijingDate.getFullYear();
+    const month = String(beijingDate.getMonth() + 1).padStart(2, '0');
+    const day = String(beijingDate.getDate()).padStart(2, '0');
+    const hours = String(beijingDate.getHours()).padStart(2, '0');
+    const minutes = String(beijingDate.getMinutes()).padStart(2, '0');
+    const seconds = String(beijingDate.getSeconds()).padStart(2, '0');
+
     return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
   }
-
-  // =====================================================
-  // 通用日志方法
-  // =====================================================
 
   debug(message: string, metadata?: Record<string, unknown>): void {
     this.log(LogLevel.DEBUG, LogType.DEBUG, message, metadata);
@@ -820,7 +840,7 @@ export class Logger {
       stack: error.stack
     } : error;
 
-    this.log(LogLevel.ERROR, LogType.ERROR, message, metadata);
+    this.log(LogLevel.ERROR, LogType.SYSTEM, message, metadata);
 
     // 错误日志总是写入文件（异步，不阻塞）
     if (this.enableFile && error instanceof Error) {

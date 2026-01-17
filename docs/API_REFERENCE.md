@@ -1,56 +1,103 @@
-# OkX API 参考手册
+# OKX API 参考手册
 
-完整 API 文档请参阅：[OKX 官方文档](https://www.okx.com/docs-v5/zh/#overview)
-
----
+> 最后更新: 2025-01-18
+> 完整 API 文档请参阅: [OKX 官方文档](https://www.okx.com/docs-v5/zh/#overview)
 
 ## 目录
 
-### [账户接口](#账户接口)
-- [获取账户配置](#获取账户配置)
-- [获取账户余额](#获取账户余额)
-- [获取持仓信息](#获取持仓信息仅合约)
-- [设置杠杆倍数](#设置杠杆倍数仅合约逐仓)
-- [获取最大可开仓数量](#获取最大可开仓数量仅合约)
-- [获取最大可用数量](#获取最大可用数量)
+### [快速导航](#快速导航)
+- [API 端点](#api-端点)
+- [模拟盘 vs 实盘](#模拟盘-vs-实盘)
+- [市场区域说明](#市场区域说明)
 
-### [交易接口](#交易接口)
-- [下单](#下单)
-- [批量下单](#批量下单)
-- [修改订单](#修改订单)
-- [撤销订单](#撤销订单)
-- [获取未成交订单列表](#获取未成交订单列表)
-- [获取历史订单记录](#获取历史订单记录)
-- [获取成交明细](#获取成交明细)
+### [接口说明](#接口说明)
+- [账户接口](#账户接口)
+- [交易接口](#交易接口)
+- [市场数据接口](#市场数据接口)
+- [公共接口](#公共接口)
+- [WebSocket 接口](#websocket-接口)
 
-### [市场数据接口](#市场数据接口)
-- [获取产品信息](#获取产品信息)
-- [获取行情数据](#获取行情数据)
-- [获取所有产品行情](#获取所有产品行情)
-- [获取 K 线数据](#获取-k-线数据)
-- [获取深度数据](#获取深度数据)
-- [获取成交数据](#获取成交数据)
-
-### [公共接口](#公共接口)
-- [获取系统时间](#获取系统时间)
-- [获取系统状态](#获取系统状态)
-
-### [WebSocket 接口](#websocket-接口)
-- [连接地址](#连接地址)
-- [登录认证](#登录认证)
-- [订阅频道](#订阅频道)
-- [频道列表](#频道列表)
-
-### [数据模型](#数据模型)
-- [产品类型](#产品类型)
-- [交易模式](#交易模式)
-- [订单状态](#订单状态)
-
-### [错误码](#错误码)
-- [通用错误码](#通用错误码)
-- [交易错误码](#交易错误码)
+### [参考信息](#参考信息)
+- [数据模型](#数据模型)
+- [错误码](#错误码)
+- [请求示例](#请求示例)
+- [重要提示](#重要提示)
 
 ---
+
+## 快速导航
+
+### API 端点
+
+#### 实盘环境
+
+```
+REST API: https://www.okx.com/api/v5
+WebSocket Public: wss://ws.okx.com:8443/ws/v5/public
+WebSocket Private: wss://ws.okx.com:8443/ws/v5/private
+WebSocket Business: wss://ws.okx.com:8443/ws/v5/business
+```
+
+#### 模拟盘环境
+
+```
+REST API: https://www.okx.com/api/v5
+WebSocket Public: wss://wspap.okx.com:8443/ws/v5/public
+WebSocket Private: wss://wspap.okx.com:8443/ws/v5/private
+WebSocket Business: wss://wspap.okx.com:8443/ws/v5/business
+```
+
+**注意**: 模拟盘和实盘的 REST API 端点相同，但 WebSocket 端点不同。区分方式是通过 API Key 的类型：
+- **模拟盘 API Key**: 在 OKX 模拟盘环境中创建
+- **实盘 API Key**: 在 OKX 实盘环境中创建
+
+### 模拟盘 vs 实盘
+
+| 特性 | 模拟盘 | 实盘 |
+|------|--------|------|
+| REST API 端点 | 相同 | 相同 |
+| WebSocket 端点 | 不同 (`wspap.okx.com`) | 不同 (`ws.okx.com`) |
+| API Key 创建环境 | 模拟盘 | 实盘 |
+| 真实资金交易 | ❌ 否 | ✅ 是 |
+| 数据真实性 | 模拟数据 | 真实市场数据 |
+| 支持功能 | 交易功能完整，不支持提币充值 | 全部功能 |
+
+**模拟盘 API Key 创建流程**:
+登录欧易账户 —> 交易 —> 模拟交易 —> 个人中心 —> 创建模拟盘 API Key —> 开始模拟交易
+
+**模拟盘请求 header**:
+需要在 REST API 请求中添加 `x-simulated-trading: 1` header。
+
+### 市场区域说明
+
+OKX 针对不同地区有不同的域名，但 WebSocket 端点保持一致：
+
+#### 全球市场 (GLOBAL)
+
+```
+域名: www.okx.com
+REST: https://www.okx.com/api/v5
+WS:   wss://ws.okx.com:8443/ws/v5/public
+```
+
+#### EEA 市场 (欧洲经济区)
+
+```
+域名: my.okx.com
+REST: https://my.okx.com/api/v5
+WS:   wss://wseeapap.okx.com:8443/ws/v5/public (模拟盘)
+```
+
+#### US 市场 (美国)
+
+```
+域名: app.okx.com
+REST: https://app.okx.com/api/v5
+```
+
+---
+
+## 接口说明
 
 ## 账户接口
 
@@ -427,9 +474,18 @@ GET /api/v5/system/status
 
 ### 连接地址
 
+#### 实盘环境
+```
+公共频道: wss://ws.okx.com:8443/ws/v5/public
+私有频道: wss://ws.okx.com:8443/ws/v5/private
+业务频道: wss://ws.okx.com:8443/ws/v5/business
+```
+
+#### 模拟盘环境
 ```
 公共频道: wss://wspap.okx.com:8443/ws/v5/public
 私有频道: wss://wspap.okx.com:8443/ws/v5/private
+业务频道: wss://wspap.okx.com:8443/ws/v5/business
 ```
 
 ### 登录认证
@@ -446,29 +502,95 @@ GET /api/v5/system/status
 }
 ```
 
+**注意**:
+- timestamp 使用秒级时间戳（不是毫秒）
+- sign 是通过 HMAC-SHA256 签名生成的
+
 ### 频道列表
+
+#### 公共频道
+
+| 频道 | 描述 |
+|------|------|
+| tickers | 行情推送 |
+| candle1m, candle3m, ... | K 线数据 (1m, 3m, 5m, 15m, 30m, 1H, 2H, 4H, 6H, 12H, 1D, 1W, 1M) |
+| books, books5 | 订单簿深度 |
+| books-l2-tbt | 产品深度 L2 TBT |
+| trades | 市场成交 |
+| status | 系统状态 |
+| funding-rate | 资金费率（仅合约） |
+| index-tickers | 指数行情（仅合约） |
+| mark-price | 标记价格（仅合约） |
+
+#### 私有频道
 
 | 频道 | 描述 |
 |------|------|
 | account | 账户余额和配置 |
-| positions | 持仓信息（仅合约） |
+| positions | 持仓信息 |
 | orders | 订单信息 |
-| tickers | 行情信息 |
-| candle1m, candle3m, etc | K 线数据 |
-| books, books5, books-l2-tbt | 订单簿深度 |
-| trades | 市场成交 |
-| status | 系统状态 |
+| orders-algo | 策略订单 |
+| balance_and_position | 账户持仓频道 |
+| liquidation-warning | 强平风险频道 |
+
+#### 业务频道操作
+
+| 操作 | 描述 |
+|------|------|
+| place-order | 下单 |
+| multiple-orders | 批量下单 |
+| cancel-order | 撤单 |
+| cancel-multiple-orders | 批量撤单 |
+| amend-order | 修改订单 |
+| close-position | 市价全平仓 |
+
+### 订阅格式
+
+```typescript
+// 订阅公共频道
+{
+  "op": "subscribe",
+  "args": [{
+    "channel": "tickers",
+    "instId": "BTC-USDT"
+  }]
+}
+
+// 订阅私有频道
+{
+  "op": "subscribe",
+  "args": [{
+    "channel": "account"
+  }]
+}
+```
+
+### 心跳保活
+
+OKX WebSocket 使用纯文本心跳：
+
+```typescript
+// 客户端发送
+ws.send("ping");
+
+// 服务器响应
+"pong"
+```
+
+**注意**: 不要使用 JSON 格式 `{"op":"ping"}`，这会导致错误。
 
 ---
 
 ## 数据模型
 
-### 产品类型
+### 产品类型 (instType)
 
 | 类型 | 描述 |
 |------|------|
 | SPOT | 现货 |
 | SWAP | 永续合约 |
+| MARGIN | 杠杆 |
+| OPTIONS | 期权 |
 
 ### 交易模式 (tdMode)
 
@@ -476,6 +598,17 @@ GET /api/v5/system/status
 |------|------|----------|
 | cash | 非保证金模式 | SPOT |
 | isolated | 逐仓保证金模式 | SWAP |
+| cross | 全仓保证金模式 | SWAP (本系统禁用) |
+
+### 订单类型 (ordType)
+
+| 类型 | 描述 |
+|------|------|
+| market | 市价单 |
+| limit | 限价单 |
+| post_only | 只挂单 |
+| fok | 全部成交或立即取消 (Fill-Or-Kill) |
+| ioc | 立即成交并取消剩余 (Immediate-Or-Cancel) |
 
 ### 订单状态
 
@@ -486,6 +619,13 @@ GET /api/v5/system/status
 | filled | 完全成交 |
 | canceled | 已撤销 |
 
+### 订单方向
+
+| 方向 | 描述 |
+|------|------|
+| buy | 买入 |
+| sell | 卖出 |
+
 ---
 
 ## 错误码
@@ -494,22 +634,211 @@ GET /api/v5/system/status
 
 | 错误码 | 描述 |
 |--------|------|
+| 0 | 成功 |
 | 50001 | IP 访问受限 |
+| 50004 | API 密钥过期 |
 | 50011 | 时间戳过期 |
 | 50012 | 签名无效 |
 | 50013 | 签名过期 |
 | 50014 | API 密钥无效 |
+| 50015 | API 密钥权限不足 |
+| 50016 | 用户被冻结 |
+| 50017 | 用户被禁用 |
 | 50018 | API 请求频率超限 |
+| 50019 | 服务端无响应 |
+| 50020 | 客户端请求频率超限 |
 | 50021 | 请求参数错误 |
+| 50022 | 时间戳格式错误 |
+| 50023 | 签名格式错误 |
+| 50024 | API 密钥 IP 受限 |
+| 50101 | API Key 不匹配当前环境 |
 
 ### 交易错误码
 
 | 错误码 | 描述 |
 |--------|------|
+| 51001 | 订单不存在 |
 | 51002 | 可用余额不足 |
 | 51003 | 订单数量超过限制 |
+| 51004 | 订单价格超过限制 |
+| 51005 | 产品未开放交易 |
+| 51006 | 产品暂停交易 |
+| 51007 | 产品已下线 |
+| 51008 | 用户被禁止交易 |
 | 51023 | 杠杆倍数无效 |
 | 51024 | 杠杆倍数超过限制 |
+| 51025 | 客户自定义订单 ID 重复 |
+| 51026 | 客户自定义订单 ID 无效 |
+| 51027 | 订单已撤销 |
+| 51028 | 订单已完全成交 |
+| 51029 | 订单不可修改 |
+| 51030 | 订单不可撤销 |
+
+### WebSocket 错误码
+
+| 错误码 | 描述 |
+|--------|------|
+| 60008 | 当前 WebSocket 端点不支持订阅私有频道 |
+| 60012 | 非法请求 |
+| 60032 | API Key 不存在 |
+
+---
+
+## 请求示例
+
+### REST API - 获取行情
+
+```typescript
+// 获取单个币种行情
+const response = await fetch('https://www.okx.com/api/v5/market/ticker?instId=BTC-USDT');
+const data = await response.json();
+
+console.log(data.data[0]);
+// {
+//   instId: 'BTC-USDT',
+//   last: '95000',
+//   lastSz: '0.01',
+//   askPx: '95001',
+//   bidPx: '94999',
+//   ...
+// }
+
+// 获取 K 线数据
+const candlesResponse = await fetch('https://www.okx.com/api/v5/market/candlesticks?instId=BTC-USDT&bar=1H&limit=10');
+const candlesData = await candlesResponse.json();
+console.log(candlesData.data);
+```
+
+### WebSocket - 公共频道订阅
+
+```typescript
+import { createWsClientFromEnv } from './src/websocket/index.js';
+
+const wsClient = createWsClientFromEnv();
+
+// 连接公共频道
+await wsClient.connectPublic();
+
+// 订阅 BTC-USDT 行情
+wsClient.subscribe(
+  {
+    channel: 'tickers',
+    instId: 'BTC-USDT',
+  },
+  (data) => {
+    console.log('Ticker update:', data);
+  }
+);
+```
+
+### WebSocket - 私有频道订阅
+
+```typescript
+const wsClient = createWsClientFromEnv();
+
+// 连接私有频道（自动登录）
+await wsClient.connectPrivate();
+
+// 订阅账户频道
+wsClient.subscribe(
+  {
+    channel: 'account',
+  },
+  (data) => {
+    console.log('Account update:', data);
+  }
+);
+```
+
+### WebSocket - 订阅 K 线
+
+```typescript
+// 订阅 1 分钟 K 线
+wsClient.subscribe(
+  {
+    channel: 'candle1m',
+    instId: 'BTC-USDT',
+  },
+  (data) => {
+    console.log('1M Candle update:', data);
+  }
+);
+
+// 订阅 1 小时 K 线
+wsClient.subscribe(
+  {
+    channel: 'candle1H',
+    instId: 'BTC-USDT',
+  },
+  (data) => {
+    console.log('1H Candle update:', data);
+  }
+);
+```
+
+---
+
+## 重要提示
+
+### 1. 模拟盘注意事项
+
+- 模拟盘环境主要用于测试交易策略
+- 模拟盘公共市场数据推送可能受限
+- 需要在模拟盘环境中创建专用的 API Key
+- REST API 请求需要添加 `x-simulated-trading: 1` header
+
+### 2. WebSocket 连接稳定性
+
+WebSocket 连接可能因为以下原因断开:
+- 网络不稳定
+- 长时间无数据传输
+- 服务器端维护
+
+建议实现:
+- 心跳保活 (ping/pong)
+- 自动重连机制
+- 订阅状态恢复
+
+### 3. 认证方式
+
+私有频道需要使用 API Key 进行认证:
+- `apiKey`: API Key
+- `secretKey`: Secret Key
+- `passphrase`: 口令短语
+
+认证信息通过 WebSocket 登录消息发送:
+```json
+{
+  "op": "login",
+  "args": [{
+    "apiKey": "your-api-key",
+    "passphrase": "your-passphrase",
+    "timestamp": "1234567890",
+    "sign": "signature-string"
+  }]
+}
+```
+
+**注意**:
+- timestamp 必须使用秒级时间戳
+- sign 通过 HMAC-SHA256 签名生成
+
+### 4. 代理支持
+
+本项目已支持通过 Clash 代理访问 OKX API：
+
+**HTTP 代理** (自动检测):
+```bash
+export HTTP_PROXY=http://127.0.0.1:7890
+export HTTPS_PROXY=http://127.0.0.1:7890
+```
+
+**SOCKS5 代理** (自动转换):
+```bash
+export ALL_PROXY=socks5://127.0.0.1:7890
+```
+
+WebSocket 使用 Bun 1.3.6+ 原生代理支持，无需额外配置。
 
 ---
 
@@ -518,6 +847,15 @@ GET /api/v5/system/status
 - **[README.md](./README.md)** - 文档导航
 - **[QUICK_START.md](./QUICK_START.md)** - 快速开始
 - **[STRATEGIES.md](./STRATEGIES.md)** - 策略说明
-- **[ARCHITECTURE.md](./ARCHITECTURE.md)** - 系统架构
+- **[SAFETY_GUIDE.md](./SAFETY_GUIDE.md)** - 安全指南
+- **[TECHNICAL_ANALYSIS.md](./TECHNICAL_ANALYSIS.md)** - 技术分析
 
 业务规则限制（杠杆限制、币种白名单）请参见 [README.md](./README.md)。
+
+---
+
+## 参考资料
+
+- [OKX 官方 API 文档](https://www.okx.com/docs-v5/zh/)
+- [OKX WebSocket 指南](https://www.okx.com/docs-v5/zh/#websocket-api)
+- [OKX 更新日志](https://www.okx.com/docs-v5/log_zh/)

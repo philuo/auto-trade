@@ -411,10 +411,10 @@ describe('风控规则', () => {
     // 总价值需要 > 1000
     const input = createMockInput({
       positions: [
-        { coin: 'BTC', amount: 0.012, avgCost: 42000, unrealizedPnL: 12 },  // 504
-        { coin: 'ETH', amount: 0.15, avgCost: 2300, unrealizedPnL: 8 },     // 345
-        { coin: 'SOL', amount: 2, avgCost: 100, unrealizedPnL: 5 },         // 200
-        { coin: 'DOGE', amount: 2000, avgCost: 0.1, unrealizedPnL: 2 },    // 200
+        { coin: 'BTC', amount: 0.012, avgCost: 42000, positionPnL: 12 },  // 504
+        { coin: 'ETH', amount: 0.15, avgCost: 2300, positionPnL: 8 },     // 345
+        { coin: 'SOL', amount: 2, avgCost: 100, positionPnL: 5 },         // 200
+        { coin: 'DOGE', amount: 2000, avgCost: 0.1, positionPnL: 2 },    // 200
         // 总计: 504 + 345 + 200 + 200 = 1249 > 1000
       ],
       availableBalance: 10000,
@@ -445,7 +445,7 @@ describe('风控规则', () => {
           coin: 'BTC',
           amount: 1,
           avgCost: 42000,
-          unrealizedPnL: 1000,
+          positionPnL: 1000,
         },
       ],
       availableBalance: 10000,
@@ -500,7 +500,7 @@ describe('风控规则', () => {
           coin: 'BTC',
           amount: 1,
           avgCost: 42000,
-          unrealizedPnL: 1000,
+          positionPnL: 1000,
         },
       ],
       availableBalance: 10000,
@@ -608,7 +608,7 @@ describe('规则引擎 - 集成测试', () => {
           coin: 'BTC',
           amount: 1,
           avgCost: 42000,
-          unrealizedPnL: 1000,
+          positionPnL: 1000,
         },
       ],
       availableBalance: 10000,

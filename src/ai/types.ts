@@ -7,6 +7,214 @@
 import type { TradingFeedback } from '../history/types.js';
 
 // =====================================================
+// JSON Schema 定义 (用于结构化输出)
+// =====================================================
+
+/**
+ * 市场扫描结果的 JSON Schema
+ */
+export const MARKET_SCAN_SCHEMA = {
+  type: 'object',
+  properties: {
+    timestamp: { type: 'number', description: '扫描时间戳（毫秒）' },
+    coins: {
+      type: 'array',
+      description: '币种分析结果',
+      items: {
+        type: 'object',
+        properties: {
+          coin: { type: 'string', description: '币种符号' },
+          price: { type: 'number', description: '当前价格' },
+          change24h: { type: 'number', description: '24小时涨跌幅（%）' },
+          volume24h: { type: 'number', description: '24小时成交量' },
+          volatility: { type: 'number', description: '波动率' },
+          trend: { type: 'string', enum: ['uptrend', 'downtrend', 'sideways'], description: '趋势方向' },
+        },
+        required: ['coin', 'price', 'change24h', 'volume24h', 'volatility', 'trend'],
+      },
+    },
+    opportunities: {
+      type: 'array',
+      description: '识别的交易机会（可选）',
+      items: {
+        type: 'object',
+        properties: {
+          coin: { type: 'string', description: '币种符号' },
+          type: { type: 'string', enum: ['breakout', 'dip', 'reversal', 'trend_follow'], description: '机会类型' },
+          confidence: { type: 'number', minimum: 0, maximum: 1, description: '置信度 (0-1)' },
+          reason: { type: 'string', description: '原因分析' },
+        },
+        required: ['coin', 'type', 'confidence', 'reason'],
+      },
+    },
+    risks: {
+      type: 'array',
+      description: '识别的市场风险（可选）',
+      items: {
+        type: 'object',
+        properties: {
+          coin: { type: 'string', description: '币种符号' },
+          type: { type: 'string', enum: ['high_volatility', 'downtrend', 'liquidity_low'], description: '风险类型' },
+          severity: { type: 'string', enum: ['low', 'medium', 'high'], description: '严重程度' },
+          description: { type: 'string', description: '风险描述' },
+        },
+        required: ['coin', 'type', 'severity', 'description'],
+      },
+    },
+  },
+  required: ['timestamp', 'coins'],
+} as const;
+
+/**
+ * 交易决策的 JSON Schema
+ */
+export const TRADING_DECISION_SCHEMA = {
+  type: 'array',
+  description: '交易决策列表',
+  items: {
+    type: 'object',
+    properties: {
+      timestamp: { type: 'number', description: '决策时间戳（毫秒）' },
+      coin: { type: 'string', description: '币种符号' },
+      action: { type: 'string', enum: ['buy', 'sell'], description: '交易动作（只输出buy或sell，不输出hold）' },
+      confidence: { type: 'number', minimum: 0, maximum: 1, description: '置信度 (0-1, 根据实际情况给出)' },
+      reason: { type: 'string', description: '决策原因' },
+      aiScore: { type: 'number', minimum: -1, maximum: 1, description: 'AI得分 (-1到1)' },
+      suggestedSize: { type: 'number', minimum: 0, description: '建议交易金额(USDT)' },
+    },
+    required: ['timestamp', 'coin', 'action', 'confidence', 'reason', 'aiScore'],
+  },
+} as const;
+
+/**
+ * 性能报告的 JSON Schema
+ */
+export const PERFORMANCE_REPORT_SCHEMA = {
+  type: 'object',
+  properties: {
+    timestamp: { type: 'number', description: '报告时间戳（毫秒）' },
+    timeRange: { type: 'string', description: '时间范围' },
+    performance: {
+      type: 'object',
+      properties: {
+        timeRange: { type: 'string' },
+        totalTrades: { type: 'number' },
+        aiDecisions: { type: 'number' },
+        ruleDecisions: { type: 'number' },
+        totalPnL: { type: 'number' },
+        pnlPercent: { type: 'string' },
+        winRate: { type: 'number' },
+        aiWinRate: { type: 'number' },
+        ruleWinRate: { type: 'number' },
+        profitFactor: { type: 'number' },
+        maxDrawdown: { type: 'number' },
+      },
+      required: ['timeRange', 'totalTrades', 'aiDecisions', 'ruleDecisions', 'totalPnL', 'winRate'],
+    },
+    aiAnalysis: { type: 'string', description: 'AI表现分析' },
+    recommendations: {
+      type: 'array',
+      items: { type: 'string' },
+      description: '改进建议',
+    },
+    shouldAdjustWeight: { type: 'boolean', description: '是否需要调整权重' },
+    suggestedWeights: {
+      type: 'object',
+      properties: {
+        aiWeight: { type: 'number', minimum: 0, maximum: 1 },
+        ruleWeight: { type: 'number', minimum: 0, maximum: 1 },
+      },
+      required: ['aiWeight', 'ruleWeight'],
+    },
+  },
+  required: ['timestamp', 'timeRange', 'performance', 'aiAnalysis', 'recommendations', 'shouldAdjustWeight'],
+} as const;
+
+/**
+ * 深度分析的 JSON Schema
+ */
+export const DEEP_ANALYSIS_SCHEMA = {
+  type: 'object',
+  properties: {
+    timestamp: { type: 'number', description: '分析时间戳（毫秒）' },
+    timeRange: { type: 'string', description: '时间范围' },
+    patterns: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          name: { type: 'string' },
+          description: { type: 'string' },
+          occurrences: { type: 'number' },
+          successRate: { type: 'number' },
+        },
+        required: ['name', 'description', 'occurrences', 'successRate'],
+      },
+    },
+    successCases: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          timestamp: { type: 'number' },
+          coin: { type: 'string' },
+          action: { type: 'string', enum: ['buy', 'sell'] },
+          result: { type: 'string', enum: ['success', 'failure'] },
+          pnl: { type: 'number' },
+          analysis: { type: 'string' },
+        },
+        required: ['timestamp', 'coin', 'action', 'result', 'pnl', 'analysis'],
+      },
+    },
+    failureCases: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          timestamp: { type: 'number' },
+          coin: { type: 'string' },
+          action: { type: 'string', enum: ['buy', 'sell'] },
+          result: { type: 'string', enum: ['success', 'failure'] },
+          pnl: { type: 'number' },
+          analysis: { type: 'string' },
+        },
+        required: ['timestamp', 'coin', 'action', 'result', 'pnl', 'analysis'],
+      },
+    },
+    recommendations: {
+      type: 'array',
+      items: { type: 'string' },
+    },
+    summary: { type: 'string' },
+  },
+  required: ['timestamp', 'timeRange', 'patterns', 'successCases', 'failureCases', 'recommendations', 'summary'],
+} as const;
+
+/**
+ * 异常分析的 JSON Schema
+ */
+export const ANOMALY_ANALYSIS_SCHEMA = {
+  type: 'object',
+  properties: {
+    timestamp: { type: 'number', description: '分析时间戳（毫秒）' },
+    anomaly: {
+      type: 'object',
+      properties: {
+        type: { type: 'string' },
+        severity: { type: 'string' },
+        description: { type: 'string' },
+      },
+      required: ['type', 'severity', 'description'],
+    },
+    severity: { type: 'string', enum: ['low', 'medium', 'high', 'critical'], description: '严重程度评估' },
+    rootCause: { type: 'string', description: '根本原因' },
+    recommendedAction: { type: 'string', enum: ['ignore', 'monitor', 'pause_trading', 'emergency_close'], description: '建议行动' },
+    analysis: { type: 'string', description: '详细分析' },
+  },
+  required: ['timestamp', 'anomaly', 'severity', 'rootCause', 'recommendedAction', 'analysis'],
+} as const;
+
+// =====================================================
 // AI 任务类型
 // =====================================================
 
@@ -193,8 +401,8 @@ export interface CoinPosition {
   avgCost: number;
   /** 当前价值 */
   currentValue: number;
-  /** 未实现盈亏 */
-  unrealizedPnL: number;
+  /** 持仓盈亏（未实现盈亏，用于区分实际盈亏） */
+  positionPnL: number;
   /** 盈亏百分比 */
   pnlPercent: number;
 }
@@ -361,7 +569,12 @@ export interface AIRequestConfig {
   /** 任务类型 */
   taskType: AITaskType;
   /** 输入数据 */
-  input: unknown;
+  input: {
+    /** 用户提示词 */
+    prompt: string;
+    /** 系统提示词（可选） */
+    systemPrompt?: string;
+  };
   /** 模型 (默认使用 GLM-4.7) */
   model?: AIModel;
   /** 最大 token 数 */
@@ -393,18 +606,30 @@ export interface AIResponse<T = unknown> {
 // =====================================================
 
 /**
- * 思考模式配置
- * 参考：https://docs.bigmodel.cn/cn/guide/capabilities/thinking-mode
+ * 交易类型
  */
-export type ThinkingMode = 'auto' | 'enabled' | 'disabled';
+export type TradingType = 'spot' | 'swap';
+
+/**
+ * 默认币种白名单配置
+ */
+export const DEFAULT_WHITELISTS = {
+  /** 现货交易白名单 */
+  spot: ['BTC', 'ETH', 'BNB', 'SOL', 'XRP', 'ADA', 'DOGE'] as const,
+  /** 合约交易白名单 */
+  swap: ['BTC', 'ETH'] as const,
+} as const;
 
 /**
  * AI 客户端配置
+ * GLM-4.7 是推理模型，内置thinking模式，无需额外配置
  */
 export interface AIClientConfig {
-  /** API Key */
-  apiKey: string;
-  /** API 基础 URL (可选，用于自定义端点) */
+  /** API Key (可选，如果不提供则从 OPENAI_API_KEY 环境变量读取) */
+  apiKey?: string;
+  /** 模型 (默认使用 GLM-4.7) */
+  model?: AIModel;
+  /** API 基础 URL (可选，如果不提供则从 OPENAI_URL 环境变量读取) */
   baseURL?: string;
   /** 超时时间 (毫秒) */
   timeout?: number;
@@ -412,19 +637,8 @@ export interface AIClientConfig {
   maxRetries?: number;
   /** 是否启用日志 */
   enableLogging?: boolean;
-  /** 币种白名单（可选，默认使用全局白名单） */
+  /** 交易类型（决定使用哪个白名单） */
+  tradingType?: TradingType;
+  /** 自定义币种白名单（可选，覆盖默认值） */
   coinWhitelist?: string[];
-  /** 思考模式配置（可选，不同任务类型可以有不同的思考模式） */
-  thinkingMode?: {
-    /** 市场扫描：关闭思考模式以获得快速响应 */
-    marketScan?: ThinkingMode;
-    /** 交易决策：关闭思考模式以获得快速响应 */
-    tradingDecision?: ThinkingMode;
-    /** 性能报告：开启思考模式进行深度分析 */
-    performanceReport?: ThinkingMode;
-    /** 深度分析：开启思考模式进行深度分析 */
-    deepAnalysis?: ThinkingMode;
-    /** 异常分析：开启思考模式进行深度分析 */
-    anomalyAnalysis?: ThinkingMode;
-  };
 }

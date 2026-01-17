@@ -349,6 +349,12 @@ export interface WsClientConfig {
   pingInterval?: number;
   proxy?: string;
 
+  // 代理控制
+  /** 是否启用代理 (默认: 根据环境变量自动检测) */
+  enableProxy?: boolean;
+  /** 代理URL (优先级高于环境变量) */
+  proxyUrl?: string;
+
   // 指数退避配置
   useExponentialBackoff?: boolean;     // 是否使用指数退避（默认 true）
   maxReconnectInterval?: number;       // 最大重连间隔（默认 60000ms = 60秒）

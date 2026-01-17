@@ -68,6 +68,17 @@ function queryIndexCount(db: Database, tableName: string): number {
   return results.length;
 }
 
+/**
+ * 获取当前本地时区日期字符串（与 FileLogStorage.getDateStr() 逻辑一致）
+ */
+function getLocalDateStr(): string {
+  const now = new Date();
+  const utcTime = now.getTime() + (now.getTimezoneOffset() * 60 * 1000);
+  const beijingTime = utcTime + (8 * 60 * 60 * 1000);
+  const beijingDate = new Date(beijingTime);
+  return `${beijingDate.getFullYear()}-${String(beijingDate.getMonth() + 1).padStart(2, '0')}-${String(beijingDate.getDate()).padStart(2, '0')}`;
+}
+
 // =====================================================
 // SQLite 日志存储测试
 // =====================================================
@@ -653,7 +664,7 @@ describe('FileLogStorage', () => {
 
       await storage.write(entry);
 
-      const date = new Date().toISOString().split('T')[0];
+      const date = getLocalDateStr();
       const logPath = path.resolve(TEST_LOGS_DIR, `system_${date}.log`);
       expect(fs.existsSync(logPath)).toBe(true);
     });
@@ -669,7 +680,7 @@ describe('FileLogStorage', () => {
 
       await storage.write(entry);
 
-      const date = new Date().toISOString().split('T')[0];
+      const date = getLocalDateStr();
       const logPath = path.resolve(TEST_LOGS_DIR, `system_${date}.log`);
       const content = await Bun.file(logPath).text();
       expect(content).toContain('Test with metadata');
@@ -695,7 +706,7 @@ describe('FileLogStorage', () => {
       await storage.write(entry1);
       await storage.write(entry2);
 
-      const date = new Date().toISOString().split('T')[0];
+      const date = getLocalDateStr();
       const logPath = path.resolve(TEST_LOGS_DIR, `system_${date}.log`);
       const content = await Bun.file(logPath).text();
       const lines = content.trim().split('\n');
@@ -719,7 +730,7 @@ describe('FileLogStorage', () => {
         message: 'Error log'
       });
 
-      const date = new Date().toISOString().split('T')[0];
+      const date = getLocalDateStr();
       const systemLogPath = path.resolve(TEST_LOGS_DIR, `system_${date}.log`);
       const errorLogPath = path.resolve(TEST_LOGS_DIR, `error_${date}.log`);
 
@@ -741,7 +752,7 @@ describe('FileLogStorage', () => {
 
       await storage.writeError(error);
 
-      const date = new Date().toISOString().split('T')[0];
+      const date = getLocalDateStr();
       const logPath = path.resolve(TEST_LOGS_DIR, `error_${date}.log`);
       const content = await Bun.file(logPath).text();
 
@@ -755,7 +766,7 @@ describe('FileLogStorage', () => {
 
       await storage.writeError(error, context);
 
-      const date = new Date().toISOString().split('T')[0];
+      const date = getLocalDateStr();
       const logPath = path.resolve(TEST_LOGS_DIR, `error_${date}.log`);
       const content = await Bun.file(logPath).text();
 
@@ -1344,7 +1355,7 @@ describe('Edge Cases and Error Scenarios', () => {
 
       await Promise.all(promises);
 
-      const date = new Date().toISOString().split('T')[0];
+      const date = getLocalDateStr();
       const logPath = path.resolve(TEST_LOGS_DIR, `system_${date}.log`);
       const content = fs.readFileSync(logPath, 'utf8');
       const lines = content.trim().split('\n');

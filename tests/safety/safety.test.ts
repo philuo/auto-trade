@@ -190,7 +190,7 @@ describe('安全验证器 - 持仓检查', () => {
           coin: 'BTC',
           amount: 0.5,
           avgCost: 42000,
-          unrealizedPnL: 500,
+          positionPnL: 500,
         },
       ],
     });
@@ -218,7 +218,7 @@ describe('安全验证器 - 持仓检查', () => {
           coin: 'BTC',
           amount: 0.1,
           avgCost: 42000,
-          unrealizedPnL: 100,
+          positionPnL: 100,
         },
       ],
     });

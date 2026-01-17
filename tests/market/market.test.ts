@@ -29,6 +29,7 @@ import {
 // =====================================================
 
 const mockOKXTicker = {
+  instType: 'SPOT',
   instId: 'BTC-USDT',
   last: '43500.50',
   lastSz: '0.5',

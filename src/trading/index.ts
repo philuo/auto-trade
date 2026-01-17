@@ -1,5 +1,5 @@
 /**
- * 现货交易协调器模块入口
+ * 交易模块入口
  *
  * 导出所有交易协调相关的类型、类和函数
  */
@@ -22,5 +22,6 @@ export type {
 // 枚举
 export { TaskStatus } from './types.js';
 
-// 交易协调器
-export { SpotCoordinator } from './coordinator.js';
+// 技术分析协调器（推荐使用）
+export { TechnicalCoordinator } from './technical-coordinator.js';
+export type { TechnicalCoordinatorConfig } from './technical-coordinator.js';

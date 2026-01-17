@@ -1,5 +1,8 @@
 /**
  * OKX API 常量定义
+ *
+ * 更新时间: 2025-01-18
+ * 参考: https://www.npmjs.com/package/okx-api
  */
 
 // =====================================================
@@ -7,21 +10,31 @@
 // =====================================================
 
 export const API_ENDPOINTS = {
-  // REST API - 模拟盘
+  // REST API - 所有环境使用相同端点
+  // 区分方式: 使用对应环境创建的 API Key
   DEMO_REST: 'https://www.okx.com',
   DEMO_REST_API: 'https://www.okx.com/api/v5',
 
-  // REST API - 实盘
   LIVE_REST: 'https://www.okx.com',
   LIVE_REST_API: 'https://www.okx.com/api/v5',
 
-  // WebSocket - 模拟盘
-  DEMO_WS_PUBLIC: 'wss://wspap.okx.com:8443/ws/v5/public',
-  DEMO_WS_PRIVATE: 'wss://wspap.okx.com:8443/ws/v5/private',
+  // WebSocket - 生产环境端点
+  WS_PUBLIC: 'wss://ws.okx.com:8443/ws/v5/public',
+  WS_PRIVATE: 'wss://ws.okx.com:8443/ws/v5/private',
+  WS_BUSINESS: 'wss://ws.okx.com:8443/ws/v5/business',
 
-  // WebSocket - 实盘
-  LIVE_WS_PUBLIC: 'wss://ws.okx.com:8443/ws/v5/public',
-  LIVE_WS_PRIVATE: 'wss://ws.okx.com:8443/ws/v5/private',
+  // WebSocket - 模拟盘环境端点（Demo Trading）
+  // 参考: https://www.okx.com/docs-v5/en/#demo-trading-services
+  // 注意：模拟盘需要在模拟盘交易页面创建专用的 API Key
+  WS_PUBLIC_DEMO: 'wss://wspap.okx.com:8443/ws/v5/public',
+  WS_PRIVATE_DEMO: 'wss://wspap.okx.com:8443/ws/v5/private',
+  WS_BUSINESS_DEMO: 'wss://wspap.okx.com:8443/ws/v5/business',
+
+  // 兼容旧版 (保留但不推荐使用)
+  DEMO_WS_PUBLIC: 'wss://wspap.okx.com:8443/ws/v5/public',   // 模拟盘
+  DEMO_WS_PRIVATE: 'wss://wspap.okx.com:8443/ws/v5/private',  // 模拟盘
+  LIVE_WS_PUBLIC: 'wss://ws.okx.com:8443/ws/v5/public',     // 生产环境
+  LIVE_WS_PRIVATE: 'wss://ws.okx.com:8443/ws/v5/private',    // 生产环境
 } as const;
 
 // =====================================================

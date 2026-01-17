@@ -180,7 +180,7 @@ export interface AccountStatus {
     coin: string;
     amount: number;
     avgCost: number;
-    unrealizedPnL: number;
+    positionPnL: number;  // 持仓盈亏（未实现盈亏，用于区分实际盈亏）
   }>;
   // 今日交易次数
   todayTradeCount: number;
